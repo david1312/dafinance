@@ -1,4 +1,4 @@
-export const CURRENCIES = ["IDR", "USD", "SGD"] as const;
+export const CURRENCIES = ["IDR", "USD", "SGD", "JPY"] as const;
 
 export type Currency = (typeof CURRENCIES)[number];
 
@@ -13,6 +13,14 @@ export function formatMoney(amount: number, currency: Currency) {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }
+
+  if (currency === "JPY") {
+    return new Intl.NumberFormat("ja-JP", {
+      style: "currency",
+      currency: "JPY",
       maximumFractionDigits: 0,
     }).format(amount);
   }

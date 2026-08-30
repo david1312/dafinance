@@ -44,7 +44,7 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-      <p className="text-sm tracking-[0.2em] text-[var(--gold)] uppercase">
+      <p className="text-sm tracking-[0.2em] text-[var(--accent-strong)] uppercase">
         dafinance
       </p>
       <h1
@@ -77,7 +77,7 @@ export default function LoginPage() {
         </label>
         {message ? <p className="text-sm text-[var(--down)]">{message}</p> : null}
         <button
-          className="w-full rounded-lg bg-[var(--gold)] py-2.5 font-medium text-[#1a150c]"
+          className="w-full rounded-lg bg-[var(--accent-strong)] py-2.5 font-medium text-[var(--on-accent)]"
           disabled={loading}
           type="submit"
         >

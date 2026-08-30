@@ -1,6 +1,6 @@
 -- Paste this into the Supabase SQL editor once per project.
 
-create type public.currency_code as enum ('IDR', 'USD', 'SGD');
+create type public.currency_code as enum ('IDR', 'USD', 'SGD', 'JPY');
 create type public.account_kind as enum ('cash', 'bank', 'ewallet', 'credit');
 create type public.category_kind as enum ('income', 'expense');
 create type public.transaction_kind as enum ('income', 'expense');
@@ -84,7 +84,10 @@ begin
   insert into public.exchange_rates (user_id, from_currency, to_currency, rate) values
     (new.id, 'USD', 'IDR', 16200),
     (new.id, 'SGD', 'IDR', 12000),
-    (new.id, 'USD', 'SGD', 1.35);
+    (new.id, 'JPY', 'IDR', 110),
+    (new.id, 'USD', 'SGD', 1.35),
+    (new.id, 'USD', 'JPY', 148),
+    (new.id, 'SGD', 'JPY', 110);
 
   return new;
 end;

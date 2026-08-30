@@ -19,7 +19,7 @@ export function AppShell({
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
       <aside className="border-b border-[var(--line)] px-5 py-6 lg:border-r lg:border-b-0">
-        <p className="text-xs tracking-[0.22em] text-[var(--gold)] uppercase">
+        <p className="text-xs tracking-[0.22em] text-[var(--accent-strong)] uppercase">
           dafinance
         </p>
         <nav className="mt-8 flex flex-wrap gap-3 lg:flex-col">
@@ -35,7 +35,7 @@ export function AppShell({
         </nav>
         <form action={signOut} className="mt-8">
           <p className="truncate text-xs text-[var(--muted)]">{email}</p>
-          <button className="mt-2 text-sm text-[var(--gold)]" type="submit">
+          <button className="mt-2 text-sm text-[var(--accent-strong)]" type="submit">
             Sign out
           </button>
         </form>

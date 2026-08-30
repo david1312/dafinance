@@ -14,7 +14,7 @@ const body = Figtree({
 
 export const metadata: Metadata = {
   title: "dafinance",
-  description: "Personal finance tracker for IDR, USD, and SGD",
+  description: "Personal finance tracker for IDR, USD, SGD, and JPY",
 };
 
 export default function RootLayout({

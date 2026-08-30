@@ -1,15 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #101412;
-  --paper: #171c19;
-  --line: #2a332e;
-  --ink: #e8eee9;
-  --muted: #9aa89f;
-  --gold: #d4b46a;
-  --gold-dim: #8a7038;
-  --up: #7dba8a;
-  --down: #d37a6b;
+  --bg: #fff7f9;
+  --paper: #ffffff;
+  --line: #f7dbe2;
+  --ink: #3f2b33;
+  --muted: #977a83;
+  --accent: #e4879f;
+  --accent-strong: #cf5f80;
+  --accent-soft: #fdeef2;
+  --on-accent: #ffffff;
+  --up: #5fa37c;
+  --down: #d9607f;
 }
 
 * {
@@ -23,7 +25,11 @@ body {
 
 body {
   margin: 0;
-  background: var(--bg);
+  background:
+    radial-gradient(circle at 12% 0%, #ffe6ec 0%, transparent 42%),
+    radial-gradient(circle at 88% 8%, #fdf0f3 0%, transparent 38%),
+    var(--bg);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
 }
@@ -38,4 +44,9 @@ select,
 textarea,
 button {
   font: inherit;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }

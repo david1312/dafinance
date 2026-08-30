@@ -1,7 +1,7 @@
 export function SetupNotice() {
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-6">
-      <p className="text-sm tracking-[0.2em] text-[var(--gold)] uppercase">
+      <p className="text-sm tracking-[0.2em] text-[var(--accent-strong)] uppercase">
         dafinance
       </p>
       <h1

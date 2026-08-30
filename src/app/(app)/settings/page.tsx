@@ -56,7 +56,7 @@ export default async function SettingsPage() {
           className="rounded-lg border border-[var(--line)] bg-[var(--paper)] px-3 py-2"
         />
         <button
-          className="rounded-lg bg-[var(--gold)] px-3 py-2 font-medium text-[#1a150c]"
+          className="rounded-lg bg-[var(--accent-strong)] px-3 py-2 font-medium text-[var(--on-accent)]"
           type="submit"
         >
           Save rate

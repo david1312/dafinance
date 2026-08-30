@@ -32,7 +32,7 @@ export default async function CategoriesPage() {
           <option value="income">income</option>
         </select>
         <button
-          className="rounded-lg bg-[var(--gold)] px-3 py-2 font-medium text-[#1a150c]"
+          className="rounded-lg bg-[var(--accent-strong)] px-3 py-2 font-medium text-[var(--on-accent)]"
           type="submit"
         >
           Add category

@@ -22,7 +22,7 @@ export default async function AccountsPage() {
         Accounts
       </h1>
       <p className="mt-1 text-[var(--muted)]">
-        Each account stays in one currency: IDR, USD, or SGD.
+        Each account stays in one currency: IDR, USD, SGD, or JPY.
       </p>
 
       <form action={createAccount} className="mt-8 grid gap-3 sm:grid-cols-4">
@@ -55,7 +55,7 @@ export default async function AccountsPage() {
           ))}
         </select>
         <button
-          className="rounded-lg bg-[var(--gold)] px-3 py-2 font-medium text-[#1a150c]"
+          className="rounded-lg bg-[var(--accent-strong)] px-3 py-2 font-medium text-[var(--on-accent)]"
           type="submit"
         >
           Add account
