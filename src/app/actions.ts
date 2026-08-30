@@ -17,6 +17,11 @@ function asKind(value: FormDataEntryValue | null): AccountKind | null {
     : null;
 }
 
+function asAmount(value: FormDataEntryValue | null) {
+  const amount = Number(String(value ?? "").replaceAll(",", ""));
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
 export async function createAccount(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -111,7 +116,7 @@ export async function createTransaction(formData: FormData) {
 
   const account_id = String(formData.get("account_id") ?? "");
   const category_id = String(formData.get("category_id") ?? "") || null;
-  const amount = Number(formData.get("amount"));
+  const amount = asAmount(formData.get("amount"));
   const kind = String(formData.get("kind") ?? "");
   const note = String(formData.get("note") ?? "").trim() || null;
   const occurred_on = String(formData.get("occurred_on") ?? "");
@@ -126,6 +131,25 @@ export async function createTransaction(formData: FormData) {
     return;
   }
 
+  const [{ data: account }, { data: category }] = await Promise.all([
+    supabase
+      .from("accounts")
+      .select("id")
+      .eq("id", account_id)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    category_id
+      ? supabase
+          .from("categories")
+          .select("id, kind")
+          .eq("id", category_id)
+          .eq("user_id", user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  if (!account || (category_id && (!category || category.kind !== kind))) return;
+
   const { error } = await supabase.from("transactions").insert({
     user_id: user.id,
     account_id,
@@ -134,7 +158,72 @@ export async function createTransaction(formData: FormData) {
     kind,
     note,
     occurred_on,
+    creator_email: user.email ?? null,
   });
+
+  if (error) return;
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+}
+
+export async function updateTransaction(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const id = String(formData.get("id") ?? "");
+  const account_id = String(formData.get("account_id") ?? "");
+  const category_id = String(formData.get("category_id") ?? "") || null;
+  const amount = asAmount(formData.get("amount"));
+  const kind = String(formData.get("kind") ?? "");
+  const note = String(formData.get("note") ?? "").trim() || null;
+  const occurred_on = String(formData.get("occurred_on") ?? "");
+
+  if (
+    !id ||
+    !account_id ||
+    !amount ||
+    (kind !== "income" && kind !== "expense") ||
+    !occurred_on
+  ) {
+    return;
+  }
+
+  const [{ data: account }, { data: category }] = await Promise.all([
+    supabase
+      .from("accounts")
+      .select("id")
+      .eq("id", account_id)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    category_id
+      ? supabase
+          .from("categories")
+          .select("id, kind")
+          .eq("id", category_id)
+          .eq("user_id", user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  if (!account || (category_id && (!category || category.kind !== kind))) return;
+
+  const { error } = await supabase
+    .from("transactions")
+    .update({
+      account_id,
+      category_id,
+      amount,
+      kind,
+      note,
+      occurred_on,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .is("deleted_at", null);
 
   if (error) return;
   revalidatePath("/transactions");
@@ -151,9 +240,14 @@ export async function deleteTransaction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const { error } = await supabase
     .from("transactions")
-    .delete()
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by: user.id,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .is("deleted_at", null);
 
   if (error) return;
   revalidatePath("/transactions");

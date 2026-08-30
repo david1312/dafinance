@@ -1,5 +1,6 @@
 import { createAccount, deleteAccount } from "@/app/actions";
-import { ACCOUNT_KINDS, CURRENCIES, formatMoney } from "@/lib/currencies";
+import { SubmitButton } from "@/components/submit-button";
+import { ACCOUNT_KINDS, CURRENCIES, accountKindLabel, formatMoney } from "@/lib/currencies";
 import { createClient } from "@/lib/supabase/server";
 import type { Account, Transaction } from "@/lib/types";
 
@@ -7,7 +8,10 @@ export default async function AccountsPage() {
   const supabase = await createClient();
   const [{ data: accounts }, { data: transactions }] = await Promise.all([
     supabase.from("accounts").select("*").order("created_at"),
-    supabase.from("transactions").select("account_id, amount, kind"),
+    supabase
+      .from("transactions")
+      .select("account_id, amount, kind")
+      .is("deleted_at", null),
   ]);
 
   const accountList = (accounts ?? []) as Account[];
@@ -29,7 +33,7 @@ export default async function AccountsPage() {
         <input
           name="name"
           required
-          placeholder="BCA / Wise / Cash"
+          placeholder="BCA / Wise / Gold / S&P"
           className="rounded-lg border border-[var(--line)] bg-[var(--paper)] px-3 py-2"
         />
         <select
@@ -39,7 +43,7 @@ export default async function AccountsPage() {
         >
           {ACCOUNT_KINDS.map((kind) => (
             <option key={kind} value={kind}>
-              {kind}
+              {accountKindLabel(kind)}
             </option>
           ))}
         </select>
@@ -54,12 +58,12 @@ export default async function AccountsPage() {
             </option>
           ))}
         </select>
-        <button
+        <SubmitButton
           className="rounded-lg bg-[var(--accent-strong)] px-3 py-2 font-medium text-[var(--on-accent)]"
-          type="submit"
+          pendingLabel="Adding…"
         >
           Add account
-        </button>
+        </SubmitButton>
       </form>
 
       <ul className="mt-8 space-y-3">
@@ -82,16 +86,19 @@ export default async function AccountsPage() {
                 <div>
                   <p className="text-lg">{account.name}</p>
                   <p className="text-sm text-[var(--muted)]">
-                    {account.kind} · {account.currency}
+                    {accountKindLabel(account.kind)} · {account.currency}
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
                   <p>{formatMoney(balance, account.currency)}</p>
                   <form action={deleteAccount}>
                     <input type="hidden" name="id" value={account.id} />
-                    <button className="text-sm text-[var(--down)]" type="submit">
+                    <SubmitButton
+                      className="text-sm text-[var(--down)]"
+                      pendingLabel="Deleting…"
+                    >
                       Delete
-                    </button>
+                    </SubmitButton>
                   </form>
                 </div>
               </li>

@@ -13,11 +13,13 @@ export function CategoryDonut({
   palette,
   emptyLabel,
   centerLabel,
+  totalDisplay,
 }: {
   slices: DonutSlice[];
   palette: string[];
   emptyLabel: string;
   centerLabel: string;
+  totalDisplay?: string;
 }) {
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
 
@@ -64,9 +66,11 @@ export function CategoryDonut({
             />
           </PieChart>
         </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
           <p className="text-xs text-[var(--muted)]">{centerLabel}</p>
-          <p className="text-lg">{slices.length} categories</p>
+          <p className="text-sm leading-snug">
+            {totalDisplay ?? `${slices.length} categories`}
+          </p>
         </div>
       </div>
 

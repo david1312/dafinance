@@ -1,5 +1,6 @@
-import Link from "next/link";
 import { signOut } from "@/app/actions";
+import { NavLink } from "@/components/nav-link";
+import { SubmitButton } from "@/components/submit-button";
 
 const links = [
   { href: "/dashboard", label: "Dashboard" },
@@ -24,20 +25,19 @@ export function AppShell({
         </p>
         <nav className="mt-8 flex flex-wrap gap-3 lg:flex-col">
           {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="text-[var(--muted)] hover:text-[var(--ink)]"
-            >
+            <NavLink key={link.href} href={link.href}>
               {link.label}
-            </Link>
+            </NavLink>
           ))}
         </nav>
         <form action={signOut} className="mt-8">
           <p className="truncate text-xs text-[var(--muted)]">{email}</p>
-          <button className="mt-2 text-sm text-[var(--accent-strong)]" type="submit">
+          <SubmitButton
+            className="mt-2 text-sm text-[var(--accent-strong)]"
+            pendingLabel="Signing out…"
+          >
             Sign out
-          </button>
+          </SubmitButton>
         </form>
       </aside>
       <main className="px-5 py-8 lg:px-10">{children}</main>

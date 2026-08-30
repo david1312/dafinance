@@ -1,8 +1,7 @@
-import { BASE_CURRENCY, CURRENCIES, formatMoney } from "@/lib/currencies";
-import { toBaseAmount } from "@/lib/money";
+import { CURRENCIES, formatMoney, type Currency } from "@/lib/currencies";
 import { createClient } from "@/lib/supabase/server";
 import { CategoryDonut, type DonutSlice } from "@/components/category-donut";
-import type { Account, Category, ExchangeRate, Transaction } from "@/lib/types";
+import type { Account, Category, Transaction } from "@/lib/types";
 
 const EXPENSE_PALETTE = [
   "#e4879f",
@@ -27,30 +26,22 @@ const INCOME_PALETTE = [
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  const [
-    { data: accounts },
-    { data: transactions },
-    { data: rates },
-    { data: categories },
-  ] = await Promise.all([
-    supabase.from("accounts").select("*").order("name"),
-    supabase
-      .from("transactions")
-      .select("*")
-      .order("occurred_on", { ascending: false }),
-    supabase.from("exchange_rates").select("*"),
-    supabase.from("categories").select("*"),
-  ]);
+  const [{ data: accounts }, { data: transactions }, { data: categories }] =
+    await Promise.all([
+      supabase.from("accounts").select("*").order("name"),
+      supabase
+        .from("transactions")
+        .select("*")
+        .is("deleted_at", null)
+        .order("occurred_on", { ascending: false }),
+      supabase.from("categories").select("*"),
+    ]);
 
   const accountList = (accounts ?? []) as Account[];
   const txList = (transactions ?? []).map((row) => ({
     ...row,
     amount: Number(row.amount),
   })) as Transaction[];
-  const rateList = (rates ?? []).map((row) => ({
-    ...row,
-    rate: Number(row.rate),
-  })) as ExchangeRate[];
   const categoryList = (categories ?? []) as Category[];
 
   const accountById = Object.fromEntries(accountList.map((a) => [a.id, a]));
@@ -79,21 +70,20 @@ export default async function DashboardPage() {
     return { currency, balance, accounts: ids.length };
   }).filter((row) => row.accounts > 0);
 
-  const baseOf = (tx: Transaction) =>
-    toBaseAmount(
-      tx.amount,
-      accountById[tx.account_id]?.currency ?? BASE_CURRENCY,
-      rateList,
-    );
+  const currencyOf = (tx: Transaction): Currency =>
+    accountById[tx.account_id]?.currency ?? "IDR";
 
-  const slicesFor = (kind: "income" | "expense"): DonutSlice[] => {
+  const slicesFor = (
+    kind: "income" | "expense",
+    currency: Currency,
+  ): DonutSlice[] => {
     const totals = monthTx
-      .filter((tx) => tx.kind === kind)
+      .filter((tx) => tx.kind === kind && currencyOf(tx) === currency)
       .reduce<Record<string, number>>((acc, tx) => {
         const label = tx.category_id
           ? (categoryById[tx.category_id]?.name ?? "Uncategorized")
           : "Uncategorized";
-        acc[label] = (acc[label] ?? 0) + baseOf(tx);
+        acc[label] = (acc[label] ?? 0) + tx.amount;
         return acc;
       }, {});
 
@@ -101,15 +91,14 @@ export default async function DashboardPage() {
       .map(([name, value]) => ({
         name,
         value,
-        display: `≈ ${formatMoney(value, BASE_CURRENCY)}`,
+        display: formatMoney(value, currency),
       }))
       .sort((a, b) => b.value - a.value);
   };
 
-  const expenseSlices = slicesFor("expense");
-  const incomeSlices = slicesFor("income");
-  const expenseTotal = expenseSlices.reduce((sum, s) => sum + s.value, 0);
-  const incomeTotal = incomeSlices.reduce((sum, s) => sum + s.value, 0);
+  const chartCurrencies = CURRENCIES.filter((currency) =>
+    monthTx.some((tx) => currencyOf(tx) === currency),
+  );
 
   return (
     <div>
@@ -117,7 +106,7 @@ export default async function DashboardPage() {
         {monthLabel}
       </h1>
       <p className="mt-1 text-[var(--muted)]">
-        Net worth stays in each account&rsquo;s own currency.
+        Amounts stay in each account&rsquo;s own currency. Nothing is converted.
       </p>
 
       <section className="mt-8">
@@ -148,42 +137,59 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      <section className="mt-10 grid gap-4 lg:grid-cols-2">
-        <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-lg">Expenses by category</h2>
-            <p className="text-sm text-[var(--down)]">
-              ≈ {formatMoney(expenseTotal, BASE_CURRENCY)}
-            </p>
-          </div>
-          <CategoryDonut
-            slices={expenseSlices}
-            palette={EXPENSE_PALETTE}
-            emptyLabel="No expenses this month yet."
-            centerLabel="Spending"
-          />
-        </article>
+      {chartCurrencies.length === 0 ? (
+        <p className="mt-10 text-[var(--muted)]">
+          No income or expenses this month yet.
+        </p>
+      ) : (
+        chartCurrencies.map((currency) => {
+          const expenseSlices = slicesFor("expense", currency);
+          const incomeSlices = slicesFor("income", currency);
+          const expenseTotal = expenseSlices.reduce((sum, s) => sum + s.value, 0);
+          const incomeTotal = incomeSlices.reduce((sum, s) => sum + s.value, 0);
 
-        <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-lg">Income by category</h2>
-            <p className="text-sm text-[var(--up)]">
-              ≈ {formatMoney(incomeTotal, BASE_CURRENCY)}
-            </p>
-          </div>
-          <CategoryDonut
-            slices={incomeSlices}
-            palette={INCOME_PALETTE}
-            emptyLabel="No income this month yet."
-            centerLabel="Income"
-          />
-        </article>
-      </section>
+          return (
+            <section key={currency} className="mt-10">
+              <h2 className="text-sm tracking-[0.14em] text-[var(--muted)] uppercase">
+                {currency} this month
+              </h2>
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h3 className="text-lg">Expenses by category</h3>
+                    <p className="text-sm text-[var(--down)]">
+                      {formatMoney(expenseTotal, currency)}
+                    </p>
+                  </div>
+                  <CategoryDonut
+                    slices={expenseSlices}
+                    palette={EXPENSE_PALETTE}
+                    emptyLabel={`No ${currency} expenses this month.`}
+                    centerLabel={`${currency} spending`}
+                    totalDisplay={formatMoney(expenseTotal, currency)}
+                  />
+                </article>
 
-      <p className="mt-6 text-xs text-[var(--muted)]">
-        Category shares are compared in {BASE_CURRENCY} using your saved rates,
-        since a single chart cannot mix currencies.
-      </p>
+                <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h3 className="text-lg">Income by category</h3>
+                    <p className="text-sm text-[var(--up)]">
+                      {formatMoney(incomeTotal, currency)}
+                    </p>
+                  </div>
+                  <CategoryDonut
+                    slices={incomeSlices}
+                    palette={INCOME_PALETTE}
+                    emptyLabel={`No ${currency} income this month.`}
+                    centerLabel={`${currency} income`}
+                    totalDisplay={formatMoney(incomeTotal, currency)}
+                  />
+                </article>
+              </div>
+            </section>
+          );
+        })
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { createCategory, deleteCategory } from "@/app/actions";
+import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
 import type { Category } from "@/lib/types";
 
@@ -31,12 +32,12 @@ export default async function CategoriesPage() {
           <option value="expense">expense</option>
           <option value="income">income</option>
         </select>
-        <button
+        <SubmitButton
           className="rounded-lg bg-[var(--accent-strong)] px-3 py-2 font-medium text-[var(--on-accent)]"
-          type="submit"
+          pendingLabel="Adding…"
         >
           Add category
-        </button>
+        </SubmitButton>
       </form>
 
       <ul className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -51,9 +52,12 @@ export default async function CategoriesPage() {
             </div>
             <form action={deleteCategory}>
               <input type="hidden" name="id" value={category.id} />
-              <button className="text-sm text-[var(--down)]" type="submit">
+              <SubmitButton
+                className="text-sm text-[var(--down)]"
+                pendingLabel="Deleting…"
+              >
                 Delete
-              </button>
+              </SubmitButton>
             </form>
           </li>
         ))}

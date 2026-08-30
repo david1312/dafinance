@@ -1,4 +1,5 @@
 import { upsertRate } from "@/app/actions";
+import { SubmitButton } from "@/components/submit-button";
 import { CURRENCIES } from "@/lib/currencies";
 import { createClient } from "@/lib/supabase/server";
 import type { ExchangeRate } from "@/lib/types";
@@ -55,12 +56,12 @@ export default async function SettingsPage() {
           placeholder="Rate"
           className="rounded-lg border border-[var(--line)] bg-[var(--paper)] px-3 py-2"
         />
-        <button
+        <SubmitButton
           className="rounded-lg bg-[var(--accent-strong)] px-3 py-2 font-medium text-[var(--on-accent)]"
-          type="submit"
+          pendingLabel="Saving…"
         >
           Save rate
-        </button>
+        </SubmitButton>
       </form>
 
       <ul className="mt-8 space-y-2">

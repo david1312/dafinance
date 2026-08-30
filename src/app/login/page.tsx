@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/env";
 import { SetupNotice } from "@/components/setup-notice";
+import { Spinner } from "@/components/spinner";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -77,10 +78,11 @@ export default function LoginPage() {
         </label>
         {message ? <p className="text-sm text-[var(--down)]">{message}</p> : null}
         <button
-          className="w-full rounded-lg bg-[var(--accent-strong)] py-2.5 font-medium text-[var(--on-accent)]"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent-strong)] py-2.5 font-medium text-[var(--on-accent)] transition disabled:cursor-not-allowed disabled:opacity-70"
           disabled={loading}
           type="submit"
         >
+          {loading ? <Spinner /> : null}
           {loading ? "Working…" : mode === "signin" ? "Sign in" : "Sign up"}
         </button>
       </form>
