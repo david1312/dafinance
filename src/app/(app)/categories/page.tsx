@@ -5,12 +5,26 @@ import type { Category } from "@/lib/types";
 
 export default async function CategoriesPage() {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("categories")
-    .select("*")
-    .order("kind")
-    .order("name");
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const [{ data }, { data: membership }, { data: usedCategories }] =
+    await Promise.all([
+      supabase.from("categories").select("*").order("kind").order("name"),
+      supabase
+        .from("household_members")
+        .select("role")
+        .eq("user_id", user?.id ?? "")
+        .maybeSingle(),
+      supabase.from("transactions").select("category_id").not("category_id", "is", null),
+    ]);
   const categories = (data ?? []) as Category[];
+  const usedCategoryIds = new Set(
+    (usedCategories ?? []).flatMap((row) =>
+      row.category_id ? [row.category_id] : [],
+    ),
+  );
+  const canDeleteCategories = membership?.role === "owner";
 
   return (
     <div>
@@ -50,15 +64,26 @@ export default async function CategoriesPage() {
               <p>{category.name}</p>
               <p className="text-sm text-[var(--muted)]">{category.kind}</p>
             </div>
-            <form action={deleteCategory}>
-              <input type="hidden" name="id" value={category.id} />
-              <SubmitButton
-                className="text-sm text-[var(--down)]"
-                pendingLabel="Deleting…"
-              >
-                Delete
-              </SubmitButton>
-            </form>
+            {canDeleteCategories ? (
+              usedCategoryIds.has(category.id) ? (
+                <span
+                  className="text-xs text-[var(--muted)]"
+                  title="Categories used by a transaction cannot be deleted"
+                >
+                  In use
+                </span>
+              ) : (
+                <form action={deleteCategory}>
+                  <input type="hidden" name="id" value={category.id} />
+                  <SubmitButton
+                    className="text-sm text-[var(--down)]"
+                    pendingLabel="Deleting…"
+                  >
+                    Delete
+                  </SubmitButton>
+                </form>
+              )
+            ) : null}
           </li>
         ))}
       </ul>

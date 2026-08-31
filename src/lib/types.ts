@@ -2,6 +2,7 @@ import type { AccountKind, Currency } from "./currencies";
 
 export type Account = {
   id: string;
+  user_id: string;
   name: string;
   kind: AccountKind;
   currency: Currency;
@@ -9,8 +10,17 @@ export type Account = {
 
 export type Category = {
   id: string;
+  user_id: string;
   name: string;
   kind: "income" | "expense";
+};
+
+export type HouseholdMember = {
+  user_id: string;
+  household_id: string;
+  role: "owner" | "member";
+  email: string;
+  created_at: string;
 };
 
 export type Transaction = {
