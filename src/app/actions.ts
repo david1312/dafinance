@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { ACCOUNT_KINDS, CURRENCIES, type AccountKind, type Currency } from "@/lib/currencies";
+
+export type MemberActionState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
 
 function asCurrency(value: FormDataEntryValue | null): Currency | null {
   if (typeof value !== "string") return null;
@@ -67,6 +73,52 @@ export async function deleteAccount(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+export async function updateAccount(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const kind = asKind(formData.get("kind"));
+  const currency = asCurrency(formData.get("currency"));
+
+  if (!id || !name || !kind || !currency) return;
+
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("currency")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!account) return;
+
+  if (account.currency !== currency) {
+    const { data: existingTransaction } = await supabase
+      .from("transactions")
+      .select("id")
+      .eq("account_id", id)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingTransaction) return;
+  }
+
+  const { error } = await supabase
+    .from("accounts")
+    .update({ name, kind, currency })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) return;
+  revalidatePath("/accounts");
+  revalidatePath("/dashboard");
+  revalidatePath("/transactions");
+}
+
 export async function createCategory(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -100,8 +152,7 @@ export async function deleteCategory(formData: FormData) {
   const { error } = await supabase
     .from("categories")
     .delete()
-    .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("id", id);
 
   if (error) return;
   revalidatePath("/categories");
@@ -136,14 +187,12 @@ export async function createTransaction(formData: FormData) {
       .from("accounts")
       .select("id")
       .eq("id", account_id)
-      .eq("user_id", user.id)
       .maybeSingle(),
     category_id
       ? supabase
           .from("categories")
           .select("id, kind")
           .eq("id", category_id)
-          .eq("user_id", user.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
@@ -196,14 +245,12 @@ export async function updateTransaction(formData: FormData) {
       .from("accounts")
       .select("id")
       .eq("id", account_id)
-      .eq("user_id", user.id)
       .maybeSingle(),
     category_id
       ? supabase
           .from("categories")
           .select("id, kind")
           .eq("id", category_id)
-          .eq("user_id", user.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
@@ -222,7 +269,6 @@ export async function updateTransaction(formData: FormData) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .eq("user_id", user.id)
     .is("deleted_at", null);
 
   if (error) return;
@@ -246,7 +292,6 @@ export async function deleteTransaction(formData: FormData) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .eq("user_id", user.id)
     .is("deleted_at", null);
 
   if (error) return;
@@ -295,4 +340,75 @@ export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");
+}
+
+export async function createHouseholdMember(
+  _previousState: MemberActionState,
+  formData: FormData,
+): Promise<MemberActionState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { status: "error", message: "Your session has expired." };
+  }
+
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+
+  if (!email || !email.includes("@")) {
+    return { status: "error", message: "Enter a valid email address." };
+  }
+
+  if (password.length < 8) {
+    return {
+      status: "error",
+      message: "Password must be at least 8 characters.",
+    };
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("household_members")
+    .select("household_id, role")
+    .eq("user_id", user.id)
+    .single();
+
+  if (membershipError || membership?.role !== "owner") {
+    return {
+      status: "error",
+      message: "Only the household owner can create another user.",
+    };
+  }
+
+  try {
+    const admin = createAdminClient();
+    const { error } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      app_metadata: {
+        household_id: membership.household_id,
+        household_role: "member",
+        created_by: user.id,
+      },
+    });
+
+    if (error) {
+      return { status: "error", message: error.message };
+    }
+  } catch (error) {
+    return {
+      status: "error",
+      message:
+        error instanceof Error ? error.message : "Could not create the user.",
+    };
+  }
+
+  revalidatePath("/family");
+  return {
+    status: "success",
+    message: `${email} can now sign in with the password you provided.`,
+  };
 }

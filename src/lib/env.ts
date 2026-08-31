@@ -18,6 +18,14 @@ export function getSupabaseEnv() {
   return { url, anonKey };
 }
 
+export function getSupabaseAdminEnv() {
+  const { url } = getSupabaseEnv();
+  return {
+    url,
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  };
+}
+
 export function isSupabaseConfigured() {
   const { url, anonKey } = getSupabaseEnv();
   const configured = Boolean(url && anonKey);

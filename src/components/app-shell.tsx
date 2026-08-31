@@ -7,7 +7,7 @@ const links = [
   { href: "/transactions", label: "Transactions" },
   { href: "/accounts", label: "Accounts" },
   { href: "/categories", label: "Categories" },
-  { href: "/settings", label: "Rates" },
+  { href: "/family", label: "Household" },
 ];
 
 export function AppShell({
