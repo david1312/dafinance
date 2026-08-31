@@ -4,17 +4,22 @@ function describeValue(value: string | undefined) {
   return value;
 }
 
-// The anon key is safe to ship to the browser, but logging it in full makes it
-// easy to paste into a bug report by accident.
 function describeKey(value: string | undefined) {
   if (value === undefined) return "MISSING (undefined)";
   if (value.trim() === "") return "EMPTY STRING";
   return `present, ${value.length} chars, starts with "${value.slice(0, 12)}"`;
 }
 
+export function getSupabaseEnv() {
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  return { url, anonKey };
+}
+
 export function isSupabaseConfigured() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const { url, anonKey } = getSupabaseEnv();
   const configured = Boolean(url && anonKey);
 
   if (!configured) {
@@ -22,8 +27,10 @@ export function isSupabaseConfigured() {
     console.warn(
       [
         `[supabase] not configured (${runtime})`,
-        `  NEXT_PUBLIC_SUPABASE_URL: ${describeValue(url)}`,
-        `  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${describeKey(anonKey)}`,
+        `  NEXT_PUBLIC_SUPABASE_URL: ${describeValue(process.env.NEXT_PUBLIC_SUPABASE_URL)}`,
+        `  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${describeKey(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)}`,
+        `  SUPABASE_URL: ${describeValue(process.env.SUPABASE_URL)}`,
+        `  SUPABASE_ANON_KEY: ${describeKey(process.env.SUPABASE_ANON_KEY)}`,
       ].join("\n"),
     );
   }
