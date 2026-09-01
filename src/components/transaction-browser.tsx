@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AmountInput } from "@/components/amount-input";
+import { Modal } from "@/components/modal";
 import { CuteLoader, Spinner } from "@/components/spinner";
 import { TableSkeleton } from "@/components/skeleton";
+import { TransactionForm } from "@/components/transaction-form";
 import { TransactionTable } from "@/components/transaction-table";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -45,6 +47,7 @@ export function TransactionBrowser({
   const [data, setData] = useState<PageData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const loadPage = useCallback(
     async (signal?: AbortSignal) => {
@@ -248,6 +251,28 @@ export function TransactionBrowser({
           Include deleted transactions and their logs
         </label>
       </form>
+
+      {accounts.length > 0 ? (
+        <div className="mt-6 flex justify-end">
+          <button
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 py-2.5 font-medium text-[var(--on-accent)] transition hover:opacity-90 sm:w-auto"
+            type="button"
+            onClick={() => setAdding(true)}
+          >
+            Add transaction
+          </button>
+        </div>
+      ) : null}
+
+      {adding ? (
+        <Modal title="Add transaction" onClose={() => setAdding(false)}>
+          <TransactionForm
+            accounts={accounts}
+            categories={categories}
+            onSubmitted={() => setAdding(false)}
+          />
+        </Modal>
+      ) : null}
 
       <div className="mt-6">
         {isLoading && !data ? (

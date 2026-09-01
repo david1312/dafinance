@@ -384,7 +384,7 @@ export async function createHouseholdMember(
 
   try {
     const admin = createAdminClient();
-    const { error } = await admin.auth.admin.createUser({
+    const { data: created, error } = await admin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
@@ -397,6 +397,25 @@ export async function createHouseholdMember(
 
     if (error) {
       return { status: "error", message: error.message };
+    }
+
+    const newUserId = created?.user?.id;
+
+    if (!newUserId) {
+      return { status: "error", message: "Supabase did not return the user." };
+    }
+
+    const { error: attachError } = await admin.rpc(
+      "attach_user_to_household",
+      {
+        target_user_id: newUserId,
+        target_household_id: membership.household_id,
+      },
+    );
+
+    if (attachError) {
+      await admin.auth.admin.deleteUser(newUserId);
+      return { status: "error", message: attachError.message };
     }
   } catch (error) {
     return {
