@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { TransactionBrowser } from "@/components/transaction-browser";
-import { TransactionForm } from "@/components/transaction-form";
 import { TableSkeleton } from "@/components/skeleton";
 import { createClient } from "@/lib/supabase/server";
 import type { Account, Category } from "@/lib/types";
@@ -28,12 +27,7 @@ export default async function TransactionsPage() {
         <p className="mt-8 text-[var(--muted)]">
           Add an account first, then come back to log money in and out.
         </p>
-      ) : (
-        <section className="mt-8 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5">
-          <h2 className="mb-4 text-lg">Add transaction</h2>
-          <TransactionForm accounts={accountList} categories={categoryList} />
-        </section>
-      )}
+      ) : null}
 
       <Suspense fallback={<TableSkeleton />}>
         <TransactionBrowser accounts={accountList} categories={categoryList} />
