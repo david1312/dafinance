@@ -1,6 +1,9 @@
 export const DASHBOARD_MIN_DATE = "2026-08-31";
 
 export const RANGE_PRESETS = [
+  { id: "today", label: "Today" },
+  { id: "yesterday", label: "Yesterday" },
+  { id: "last_7_days", label: "Last 7 days" },
   { id: "this_month", label: "This month" },
   { id: "last_month", label: "Last month" },
   { id: "last_3_months", label: "Last 3 months" },
@@ -48,7 +51,26 @@ export function rangeForPreset(
   let from = DASHBOARD_MIN_DATE;
   let to = today;
 
-  if (preset === "this_month") {
+  if (preset === "today") {
+    from = today;
+    to = today;
+  } else if (preset === "yesterday") {
+    const yesterday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - 1,
+    );
+    from = isoDate(yesterday);
+    to = from;
+  } else if (preset === "last_7_days") {
+    const sevenDaysAgo = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - 6,
+    );
+    from = isoDate(sevenDaysAgo);
+    to = today;
+  } else if (preset === "this_month") {
     from = isoDate(startOfMonth(now));
     to = today;
   } else if (preset === "last_month") {
