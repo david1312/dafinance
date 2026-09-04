@@ -2,10 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { CategoryDonut, type DonutSlice } from "@/components/category-donut";
-import { Modal } from "@/components/modal";
 import {
   CURRENCIES,
-  accountKindLabel,
   formatMoney,
   type Currency,
 } from "@/lib/currencies";
@@ -59,7 +57,7 @@ export function DashboardView({
   const [customTo, setCustomTo] = useState(todayIso());
   const [expenseIds, setExpenseIds] = useState<string[]>([]);
   const [incomeIds, setIncomeIds] = useState<string[]>([]);
-  const [openCurrency, setOpenCurrency] = useState<Currency | null>(null);
+  const [netWorthExpanded, setNetWorthExpanded] = useState(false);
 
   const { from, to } = rangeForPreset(preset, customFrom, customTo);
   const rangeLabel = formatRangeLabel(from, to);
@@ -162,9 +160,6 @@ export function DashboardView({
     ),
   );
 
-  const openAccounts =
-    netByCurrency.find((row) => row.currency === openCurrency)?.accounts ?? [];
-
   return (
     <div>
       <h1 className="text-4xl" style={{ fontFamily: "var(--font-display)" }}>
@@ -174,7 +169,91 @@ export function DashboardView({
         {rangeLabel}. Amounts stay in each account&rsquo;s own currency.
       </p>
 
-      <div className="mt-5 flex flex-wrap gap-2">
+      <section className="mt-8">
+        <h2 className="text-sm tracking-[0.14em] text-[var(--muted)] uppercase">
+          Net worth by currency
+        </h2>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          Balances as of {formatRangeLabel(to, to)}.
+        </p>
+        {netByCurrency.length === 0 ? (
+          <p className="mt-4 text-[var(--muted)]">
+            Add an account to see balances here.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {netByCurrency.map((row) => (
+              <details
+                key={row.currency}
+                open={netWorthExpanded}
+                className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5"
+              >
+                <summary
+                  className="cursor-pointer list-none"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setNetWorthExpanded((expanded) => !expanded);
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm text-[var(--muted)]">{row.currency}</p>
+                      <p className="mt-2 text-2xl">{formatMoney(row.balance, row.currency)}</p>
+                      <p className="mt-1 text-xs text-[var(--accent-strong)]">
+                        {row.accounts.length} account{row.accounts.length > 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <span
+                      aria-hidden="true"
+                      className={`accordion-arrow mt-1 text-lg text-[var(--accent-strong)] ${netWorthExpanded ? "accordion-arrow-open" : ""}`}
+                    >
+                      &gt;
+                    </span>
+                  </div>
+                </summary>
+                <div className={`accordion-content ${netWorthExpanded ? "accordion-content-open" : ""}`}>
+                <ul className="accordion-content-inner mt-4 space-y-2 border-t border-[var(--line)] pt-4">
+                  {row.accounts.map((account) => (
+                    <li key={account.id} className="flex items-center justify-between gap-4 text-sm">
+                      <span className="truncate">{account.name}</span>
+                      <span className="shrink-0 text-[var(--muted)]">
+                        {formatMoney(
+                          netWorthTransactions
+                            .filter((transaction) => transaction.account_id === account.id)
+                            .reduce(
+                              (sum, transaction) =>
+                                sum + (transaction.kind === "income" ? transaction.amount : -transaction.amount),
+                              0,
+                            ),
+                          account.currency,
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                </div>
+              </details>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-8 grid gap-4 lg:grid-cols-2">
+        <CategoryFilter
+          kind="expense"
+          categories={expenseCategories}
+          selected={expenseIds}
+          onChange={setExpenseIds}
+        />
+        <CategoryFilter
+          kind="income"
+          categories={incomeCategories}
+          selected={incomeIds}
+          onChange={setIncomeIds}
+        />
+      </section>
+
+       <div className="mt-5 flex flex-wrap gap-2">
         {RANGE_PRESETS.map((item) => (
           <button
             key={item.id}
@@ -227,57 +306,6 @@ export function DashboardView({
           </label>
         </div>
       ) : null}
-
-      <section className="mt-8">
-        <h2 className="text-sm tracking-[0.14em] text-[var(--muted)] uppercase">
-          Net worth by currency
-        </h2>
-        <p className="mt-1 text-xs text-[var(--muted)]">
-          Balances as of {formatRangeLabel(to, to)}.
-        </p>
-        {netByCurrency.length === 0 ? (
-          <p className="mt-4 text-[var(--muted)]">
-            Add an account to see balances here.
-          </p>
-        ) : (
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {netByCurrency.map((row) => (
-              <article
-                key={row.currency}
-                className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5"
-              >
-                <p className="text-sm text-[var(--muted)]">{row.currency}</p>
-                <p className="mt-2 text-2xl">
-                  {formatMoney(row.balance, row.currency)}
-                </p>
-                <button
-                  className="mt-1 text-left text-xs text-[var(--accent-strong)] underline-offset-2 hover:underline"
-                  type="button"
-                  onClick={() => setOpenCurrency(row.currency)}
-                >
-                  {row.accounts.length} account
-                  {row.accounts.length > 1 ? "s" : ""}
-                </button>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="mt-8 grid gap-4 lg:grid-cols-2">
-        <CategoryFilter
-          kind="expense"
-          categories={expenseCategories}
-          selected={expenseIds}
-          onChange={setExpenseIds}
-        />
-        <CategoryFilter
-          kind="income"
-          categories={incomeCategories}
-          selected={incomeIds}
-          onChange={setIncomeIds}
-        />
-      </section>
 
       {chartCurrencies.length === 0 ? (
         <p className="mt-10 text-[var(--muted)]">
@@ -339,42 +367,6 @@ export function DashboardView({
         })
       )}
 
-      {openCurrency ? (
-        <Modal
-          title={`${openCurrency} accounts`}
-          onClose={() => setOpenCurrency(null)}
-        >
-          <ul className="space-y-3">
-            {openAccounts.map((account) => {
-              const balance = netWorthTransactions
-                .filter((transaction) => transaction.account_id === account.id)
-                .reduce(
-                  (sum, transaction) =>
-                    sum +
-                    (transaction.kind === "income"
-                      ? transaction.amount
-                      : -transaction.amount),
-                  0,
-                );
-
-              return (
-                <li
-                  key={account.id}
-                  className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--line)] px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate">{account.name}</p>
-                    <p className="mt-0.5 text-xs text-[var(--muted)]">
-                      {accountKindLabel(account.kind)}
-                    </p>
-                  </div>
-                  <p className="shrink-0">{formatMoney(balance, account.currency)}</p>
-                </li>
-              );
-            })}
-          </ul>
-        </Modal>
-      ) : null}
     </div>
   );
 }
