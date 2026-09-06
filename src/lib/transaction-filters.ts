@@ -5,6 +5,7 @@ export type TransactionFilterState = {
   to: string;
   amountMode: "gte" | "lte";
   amount: number;
+  accountId: string;
   showDeleted: boolean;
   cursorAt: string;
   cursorId: string;
@@ -26,6 +27,7 @@ export function parseFilters(
     to: read("to"),
     amountMode: read("amountMode") === "lte" ? "lte" : "gte",
     amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
+    accountId: read("accountId"),
     showDeleted: read("deleted") === "1",
     cursorAt: read("cursorAt"),
     cursorId: read("cursorId"),
@@ -36,7 +38,12 @@ export function parseFilters(
 export function buildFilterQuery(
   filters: Pick<
     TransactionFilterState,
-    "from" | "to" | "amountMode" | "amount" | "showDeleted"
+    | "from"
+    | "to"
+    | "amountMode"
+    | "amount"
+    | "accountId"
+    | "showDeleted"
   >,
   cursor?: { cursorAt: string; cursorId: string; direction: "next" | "prev" },
 ) {
@@ -49,6 +56,7 @@ export function buildFilterQuery(
     search.set("amount", String(filters.amount));
   }
   if (filters.showDeleted) search.set("deleted", "1");
+  if (filters.accountId) search.set("accountId", filters.accountId);
   if (cursor) {
     search.set("cursorAt", cursor.cursorAt);
     search.set("cursorId", cursor.cursorId);

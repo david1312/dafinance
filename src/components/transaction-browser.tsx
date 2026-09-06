@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AmountInput } from "@/components/amount-input";
 import { Modal } from "@/components/modal";
+import { SearchableAccountSelect } from "@/components/searchable-account-select";
 import { CuteLoader, Spinner } from "@/components/spinner";
 import { TableSkeleton } from "@/components/skeleton";
 import { TransactionForm } from "@/components/transaction-form";
@@ -63,6 +64,7 @@ export function TransactionBrowser({
       if (!state.showDeleted) query = query.is("deleted_at", null);
       if (state.from) query = query.gte("occurred_on", state.from);
       if (state.to) query = query.lte("occurred_on", state.to);
+      if (state.accountId) query = query.eq("account_id", state.accountId);
       if (state.amount > 0) {
         query =
           state.amountMode === "lte"
@@ -148,6 +150,7 @@ export function TransactionBrowser({
     const query = buildFilterQuery({
       from: String(formData.get("from") ?? ""),
       to: String(formData.get("to") ?? ""),
+      accountId: String(formData.get("accountId") ?? ""),
       amountMode: formData.get("amountMode") === "lte" ? "lte" : "gte",
       amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
       showDeleted: formData.get("deleted") === "1",
@@ -184,7 +187,7 @@ export function TransactionBrowser({
   return (
     <section className="mt-8">
       <form
-        className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 sm:grid-cols-2 lg:grid-cols-5"
+        className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 sm:grid-cols-2 lg:grid-cols-6"
         onSubmit={applyFilters}
       >
         <label className="grid gap-1 text-xs text-[var(--muted)]">
@@ -221,6 +224,16 @@ export function TransactionBrowser({
           <AmountInput
             className={fieldClass}
             defaultValue={filters.amount > 0 ? filters.amount : undefined}
+            required={false}
+          />
+        </label>
+        <label className="grid gap-1 text-xs text-[var(--muted)]">
+          Account
+          <SearchableAccountSelect
+            accounts={accounts}
+            allowEmpty
+            defaultValue={filters.accountId}
+            name="accountId"
             required={false}
           />
         </label>

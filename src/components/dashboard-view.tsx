@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CategoryDonut, type DonutSlice } from "@/components/category-donut";
+import { SearchableAccountSelect } from "@/components/searchable-account-select";
 import {
   CURRENCIES,
   formatMoney,
@@ -57,6 +58,7 @@ export function DashboardView({
   const [customTo, setCustomTo] = useState(todayIso());
   const [expenseIds, setExpenseIds] = useState<string[]>([]);
   const [incomeIds, setIncomeIds] = useState<string[]>([]);
+  const [accountId, setAccountId] = useState("");
   const [netWorthExpanded, setNetWorthExpanded] = useState(false);
 
   const { from, to } = rangeForPreset(preset, customFrom, customTo);
@@ -83,9 +85,10 @@ export function DashboardView({
   const periodTransactions = useMemo(
     () =>
       transactions.filter((transaction) =>
-        inDateRange(transaction.occurred_on, from, to),
+        inDateRange(transaction.occurred_on, from, to) &&
+        (!accountId || transaction.account_id === accountId),
       ),
-    [from, to, transactions],
+    [accountId, from, to, transactions],
   );
 
   const netWorthTransactions = useMemo(
@@ -94,8 +97,12 @@ export function DashboardView({
     [to, transactions],
   );
 
+  const dashboardAccounts = accountId
+    ? accounts.filter((account) => account.id === accountId)
+    : accounts;
+
   const netByCurrency = CURRENCIES.map((currency) => {
-    const currencyAccounts = accounts.filter(
+    const currencyAccounts = dashboardAccounts.filter(
       (account) => account.currency === currency,
     );
     const ids = currencyAccounts.map((account) => account.id);
@@ -239,6 +246,18 @@ export function DashboardView({
       </section>
 
       <section className="mt-8 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4">
+          <h2 className="text-sm text-[var(--muted)]">Filter account</h2>
+          <div className="mt-3">
+            <SearchableAccountSelect
+              accounts={accounts}
+              allowEmpty
+              name="dashboard-account"
+              required={false}
+              onChange={setAccountId}
+            />
+          </div>
+        </div>
         <CategoryFilter
           kind="expense"
           categories={expenseCategories}
