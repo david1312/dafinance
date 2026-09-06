@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { accountKindLabel } from "@/lib/currencies";
 import type { Account } from "@/lib/types";
 
@@ -13,21 +13,32 @@ export function SearchableAccountSelect({
   defaultValue,
   name = "account_id",
   required = true,
+  allowEmpty = false,
+  onChange,
 }: {
   accounts: Account[];
   defaultValue?: string;
   name?: string;
   required?: boolean;
+  allowEmpty?: boolean;
+  onChange?: (accountId: string) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(
-    defaultValue ?? accounts[0]?.id ?? "",
+    defaultValue ?? (allowEmpty ? "" : accounts[0]?.id ?? ""),
   );
 
   const selected = accounts.find((account) => account.id === selectedId);
-  const display = open ? query : selected ? accountLabel(selected) : "";
+  const display = open
+    ? query
+    : selected
+      ? accountLabel(selected)
+      : allowEmpty
+        ? "All accounts"
+        : "";
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -57,13 +68,23 @@ export function SearchableAccountSelect({
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, []);
 
+  useEffect(() => {
+    setSelectedId(defaultValue ?? (allowEmpty ? "" : accounts[0]?.id ?? ""));
+  }, [accounts, allowEmpty, defaultValue]);
+
   function choose(account: Account) {
     setSelectedId(account.id);
+    onChange?.(account.id);
     setQuery("");
     setOpen(false);
   }
 
-  const listId = "account-options";
+  function clearSelection() {
+    setSelectedId("");
+    onChange?.("");
+    setQuery("");
+    setOpen(false);
+  }
 
   return (
     <div className="relative" ref={rootRef}>
@@ -93,6 +114,21 @@ export function SearchableAccountSelect({
           id={listId}
           role="listbox"
         >
+          {allowEmpty ? (
+            <li>
+              <button
+                aria-selected={!selectedId}
+                className={`w-full px-3 py-2.5 text-left text-sm transition hover:bg-[var(--accent-soft)] ${
+                  !selectedId ? "bg-[var(--accent-soft)]" : ""
+                }`}
+                role="option"
+                type="button"
+                onClick={clearSelection}
+              >
+                All accounts
+              </button>
+            </li>
+          ) : null}
           {matches.length === 0 ? (
             <li className="px-3 py-2.5 text-sm text-[var(--muted)]">
               No matching accounts
