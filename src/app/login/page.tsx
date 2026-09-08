@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/env";
 import { SetupNotice } from "@/components/setup-notice";
@@ -86,6 +87,14 @@ export default function LoginPage() {
           {loading ? "Working…" : mode === "signin" ? "Sign in" : "Sign up"}
         </button>
       </form>
+      {mode === "signin" ? (
+        <Link
+          className="mt-4 text-sm text-[var(--muted)]"
+          href="/forgot-password"
+        >
+          Forgot password?
+        </Link>
+      ) : null}
       <button
         className="mt-4 text-sm text-[var(--muted)]"
         type="button"

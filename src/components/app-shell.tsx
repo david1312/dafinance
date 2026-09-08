@@ -5,6 +5,7 @@ import { SubmitButton } from "@/components/submit-button";
 const links = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/transactions", label: "Transactions" },
+  { href: "/reports", label: "Reports" },
   { href: "/accounts", label: "Accounts" },
   { href: "/categories", label: "Categories" },
   { href: "/family", label: "Household" },
