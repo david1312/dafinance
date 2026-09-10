@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { deleteAccount, updateAccount } from "@/app/actions";
+import { Modal } from "@/components/modal";
 import { SubmitButton } from "@/components/submit-button";
+import { TransferForm } from "@/components/transfer-form";
 import { ACCOUNT_KINDS, CURRENCIES, accountKindLabel, formatMoney } from "@/lib/currencies";
 import type { Account, Transaction } from "@/lib/types";
 
@@ -20,6 +22,7 @@ export function AccountList({
   userId?: string;
 }) {
   const [query, setQuery] = useState("");
+  const [transferring, setTransferring] = useState(false);
   const usedIds = new Set(usedAccountIds);
   const filteredAccounts = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -35,16 +38,36 @@ export function AccountList({
 
   return (
     <section className="mt-8">
-      <label className="grid gap-1 text-sm text-[var(--muted)]">
-        Search accounts
-        <input
-          className="rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3 py-2.5 outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
-          placeholder="Name, type, or currency"
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </label>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <label className="grid flex-1 gap-1 text-sm text-[var(--muted)]">
+          Search accounts
+          <input
+            className="rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3 py-2.5 outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+            placeholder="Name, type, or currency"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+        {accounts.length > 1 ? (
+          <button
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 py-2.5 font-medium text-[var(--on-accent)] transition hover:opacity-90"
+            type="button"
+            onClick={() => setTransferring(true)}
+          >
+            Transfer
+          </button>
+        ) : null}
+      </div>
+
+      {transferring ? (
+        <Modal title="Transfer between accounts" onClose={() => setTransferring(false)}>
+          <TransferForm
+            accounts={accounts}
+            onSubmitted={() => setTransferring(false)}
+          />
+        </Modal>
+      ) : null}
 
       <ul className="mt-5 space-y-3">
         {filteredAccounts.length === 0 ? (

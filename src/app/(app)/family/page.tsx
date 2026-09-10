@@ -1,4 +1,6 @@
+import { ChangePasswordForm } from "@/components/change-password-form";
 import { CreateMemberForm } from "@/components/create-member-form";
+import { ResetMemberPasswordButton } from "@/components/reset-member-password-button";
 import { createClient } from "@/lib/supabase/server";
 import type { HouseholdMember } from "@/lib/types";
 
@@ -33,6 +35,14 @@ export default async function FamilyPage() {
         transactions. Accounts can only be changed by their owner.
       </p>
 
+      <section className="mt-8">
+        <h2 className="text-lg">Change password</h2>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          Update the password you use to sign in.
+        </p>
+        <ChangePasswordForm />
+      </section>
+
       {isOwner ? (
         <section className="mt-8">
           <h2 className="text-lg">Add a user</h2>
@@ -56,6 +66,9 @@ export default async function FamilyPage() {
                 {member.role === "owner" ? "Household owner" : "Household user"}
                 {member.user_id === user?.id ? " · You" : ""}
               </p>
+              {isOwner && member.user_id !== user?.id ? (
+                <ResetMemberPasswordButton userId={member.user_id} />
+              ) : null}
             </li>
           ))}
         </ul>

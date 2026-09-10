@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import { CategoryDonut, type DonutSlice } from "@/components/category-donut";
 import { SearchableAccountSelect } from "@/components/searchable-account-select";
 import {
@@ -169,12 +170,24 @@ export function DashboardView({
 
   return (
     <div>
-      <h1 className="text-4xl" style={{ fontFamily: "var(--font-display)" }}>
-        {preset === "custom" ? "Custom range" : RANGE_PRESETS.find((item) => item.id === preset)?.label}
-      </h1>
-      <p className="mt-1 text-[var(--muted)]">
-        {rangeLabel}. Amounts stay in each account&rsquo;s own currency.
-      </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-4xl" style={{ fontFamily: "var(--font-display)" }}>
+            {preset === "custom" ? "Custom range" : RANGE_PRESETS.find((item) => item.id === preset)?.label}
+          </h1>
+          <p className="mt-1 text-[var(--muted)]">
+            {rangeLabel}. Amounts stay in each account&rsquo;s own currency.
+          </p>
+        </div>
+        <Image
+          alt="dafinance"
+          className="h-14 w-14 shrink-0 rounded-2xl object-contain sm:h-16 sm:w-16"
+          height={64}
+          src="/icon.svg"
+          unoptimized
+          width={64}
+        />
+      </div>
 
       <section className="mt-8">
         <h2 className="text-sm tracking-[0.14em] text-[var(--muted)] uppercase">

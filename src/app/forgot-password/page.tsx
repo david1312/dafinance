@@ -2,39 +2,35 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { resetPasswordToDefault } from "@/app/actions";
 import { isSupabaseConfigured } from "@/lib/env";
+import { DEFAULT_RESET_PASSWORD } from "@/lib/passwords";
 import { SetupNotice } from "@/components/setup-notice";
 import { Spinner } from "@/components/spinner";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
+  const [ok, setOk] = useState(false);
   const [loading, setLoading] = useState(false);
 
   if (!isSupabaseConfigured()) {
     return <SetupNotice />;
   }
 
-  async function submit(event: React.FormEvent) {
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setMessage(null);
-    const supabase = createClient();
-    const redirectTo = `${window.location.origin}/auth/callback?next=/reset-password`;
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo,
-    });
+    setOk(false);
+
+    const formData = new FormData();
+    formData.set("email", email);
+    const result = await resetPasswordToDefault(formData);
 
     setLoading(false);
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    setSent(true);
-    setMessage("If that email is registered, we sent a reset link.");
+    setOk(result.status === "success");
+    setMessage(result.message);
   }
 
   return (
@@ -49,7 +45,11 @@ export default function ForgotPasswordPage() {
         Forgot password.
       </h1>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Enter your email and we will send a link to set a new password.
+        Enter your email. We will set the password to{" "}
+        <span className="font-medium text-[var(--ink)]">
+          {DEFAULT_RESET_PASSWORD}
+        </span>
+        . Sign in with that, then change it.
       </p>
       <form onSubmit={submit} className="mt-8 space-y-4">
         <label className="block text-sm text-[var(--muted)]">
@@ -64,18 +64,18 @@ export default function ForgotPasswordPage() {
         </label>
         {message ? (
           <p
-            className={`text-sm ${sent ? "text-[var(--up)]" : "text-[var(--down)]"}`}
+            className={`text-sm ${ok ? "text-[var(--up)]" : "text-[var(--down)]"}`}
           >
             {message}
           </p>
         ) : null}
         <button
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent-strong)] py-2.5 font-medium text-[var(--on-accent)] transition disabled:cursor-not-allowed disabled:opacity-70"
-          disabled={loading || sent}
+          disabled={loading}
           type="submit"
         >
           {loading ? <Spinner /> : null}
-          {loading ? "Sending…" : sent ? "Email sent" : "Send reset link"}
+          {loading ? "Resetting…" : "Reset password"}
         </button>
       </form>
       <Link className="mt-4 text-sm text-[var(--muted)]" href="/login">

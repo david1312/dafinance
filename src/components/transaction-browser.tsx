@@ -5,6 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AmountInput } from "@/components/amount-input";
 import { Modal } from "@/components/modal";
 import { SearchableAccountSelect } from "@/components/searchable-account-select";
+import {
+  SearchableCategorySelect,
+  UNCATEGORIZED_FILTER,
+} from "@/components/searchable-category-select";
 import { CuteLoader, Spinner } from "@/components/spinner";
 import { TableSkeleton } from "@/components/skeleton";
 import { TransactionForm } from "@/components/transaction-form";
@@ -65,6 +69,11 @@ export function TransactionBrowser({
       if (state.from) query = query.gte("occurred_on", state.from);
       if (state.to) query = query.lte("occurred_on", state.to);
       if (state.accountId) query = query.eq("account_id", state.accountId);
+      if (state.categoryId === UNCATEGORIZED_FILTER) {
+        query = query.is("category_id", null);
+      } else if (state.categoryId) {
+        query = query.eq("category_id", state.categoryId);
+      }
       if (state.amount > 0) {
         query =
           state.amountMode === "lte"
@@ -151,6 +160,7 @@ export function TransactionBrowser({
       from: String(formData.get("from") ?? ""),
       to: String(formData.get("to") ?? ""),
       accountId: String(formData.get("accountId") ?? ""),
+      categoryId: String(formData.get("categoryId") ?? ""),
       amountMode: formData.get("amountMode") === "lte" ? "lte" : "gte",
       amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
       showDeleted: formData.get("deleted") === "1",
@@ -187,7 +197,7 @@ export function TransactionBrowser({
   return (
     <section className="mt-8">
       <form
-        className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 sm:grid-cols-2 lg:grid-cols-6"
+        className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 sm:grid-cols-2 lg:grid-cols-4"
         onSubmit={applyFilters}
       >
         <label className="grid gap-1 text-xs text-[var(--muted)]">
@@ -235,6 +245,13 @@ export function TransactionBrowser({
             defaultValue={filters.accountId}
             name="accountId"
             required={false}
+          />
+        </label>
+        <label className="grid gap-1 text-xs text-[var(--muted)]">
+          Category
+          <SearchableCategorySelect
+            categories={categories}
+            defaultValue={filters.categoryId}
           />
         </label>
         <div className="flex items-end gap-3">
