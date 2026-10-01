@@ -171,6 +171,28 @@ export async function createCategory(formData: FormData) {
   revalidatePath("/transactions");
 }
 
+export async function updateCategory(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const id = String(formData.get("id") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  if (!id || !name) return;
+
+  await supabase
+    .from("categories")
+    .update({ name })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  revalidatePath("/categories");
+  revalidatePath("/dashboard");
+  revalidatePath("/transactions");
+}
+
 export async function deleteCategory(formData: FormData) {
   const supabase = await createClient();
   const {
