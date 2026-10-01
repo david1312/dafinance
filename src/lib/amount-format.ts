@@ -41,7 +41,7 @@ function parseParts(raw: string): AmountParts {
       lastLength > 0 &&
       lastLength < 3;
 
-    if (completeThousands || partialThousands) {
+    if (completeThousands || partialThousands || lastLength > 3) {
       thousands = ",";
     } else {
       decimalIndex = lastComma;
