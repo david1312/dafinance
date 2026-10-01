@@ -1,18 +1,12 @@
 "use client";
 
-import { useState } from "react";
-
-function formatAmount(value: string) {
-  const sanitized = value
-    .replaceAll(",", "")
-    .replace(/[^\d.]/g, "")
-    .replace(/^0+(?=\d)/, "");
-  const [whole = "", ...decimalParts] = sanitized.split(".");
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-
-  if (decimalParts.length === 0) return grouped;
-  return `${grouped}.${decimalParts.join("").slice(0, 2)}`;
-}
+import { useEffect, useRef, useState } from "react";
+import {
+  amountCursor,
+  formatAmountFixed,
+  formatAmountTyping,
+  parseAmount,
+} from "@/lib/amount-format";
 
 export function AmountInput({
   defaultValue,
@@ -23,23 +17,64 @@ export function AmountInput({
   className?: string;
   required?: boolean;
 }) {
-  const [display, setDisplay] = useState(
-    defaultValue === undefined ? "" : formatAmount(String(defaultValue)),
-  );
-  const rawValue = display.replaceAll(",", "");
+  const initial =
+    defaultValue === undefined ? "" : formatAmountFixed(defaultValue);
+  const [display, setDisplay] = useState(initial);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const cursorRef = useRef<number | null>(null);
+  const rawValue = canonicalAmount(display);
+
+  useEffect(() => {
+    if (cursorRef.current === null || !inputRef.current) return;
+    inputRef.current.setSelectionRange(cursorRef.current, cursorRef.current);
+    cursorRef.current = null;
+  }, [display]);
+
+  useEffect(() => {
+    const form = inputRef.current?.form;
+    if (!form) return;
+
+    const reset = () => setDisplay(initial);
+    form.addEventListener("reset", reset);
+    return () => form.removeEventListener("reset", reset);
+  }, [initial]);
 
   return (
     <>
       <input
+        ref={inputRef}
         className={className}
         inputMode="decimal"
         minLength={1}
-        placeholder="Amount"
+        placeholder="1,259.00"
         required={required}
         value={display}
-        onChange={(event) => setDisplay(formatAmount(event.target.value))}
+        onBlur={() => {
+          if (!display) return;
+          setDisplay(formatAmountFixed(display));
+        }}
+        onChange={(event) => {
+          const next = formatAmountTyping(event.target.value);
+          const cursor = amountCursor(
+            event.target.value,
+            event.target.selectionStart ?? event.target.value.length,
+            next,
+          );
+          if (next === display) {
+            event.target.setSelectionRange(cursor, cursor);
+            return;
+          }
+          cursorRef.current = cursor;
+          setDisplay(next);
+        }}
       />
       <input name="amount" type="hidden" value={rawValue} />
     </>
   );
+}
+
+function canonicalAmount(display: string) {
+  const amount = parseAmount(display);
+  if (amount === null || amount <= 0) return "";
+  return amount.toFixed(2);
 }

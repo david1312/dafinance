@@ -13,6 +13,7 @@ import { CuteLoader, Spinner } from "@/components/spinner";
 import { TableSkeleton } from "@/components/skeleton";
 import { TransactionForm } from "@/components/transaction-form";
 import { TransactionTable } from "@/components/transaction-table";
+import { parseAmount } from "@/lib/amount-format";
 import { createClient } from "@/lib/supabase/client";
 import {
   PAGE_SIZE,
@@ -154,7 +155,7 @@ export function TransactionBrowser({
   function applyFilters(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const amount = Number(String(formData.get("amount") ?? "") || 0);
+    const amount = parseAmount(formData.get("amount")) ?? 0;
 
     const query = buildFilterQuery({
       from: String(formData.get("from") ?? ""),
