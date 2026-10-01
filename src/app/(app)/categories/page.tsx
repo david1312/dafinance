@@ -1,4 +1,5 @@
-import { createCategory, deleteCategory } from "@/app/actions";
+import { createCategory } from "@/app/actions";
+import { CategoryList } from "@/components/category-list";
 import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
 import type { Category } from "@/lib/types";
@@ -54,39 +55,11 @@ export default async function CategoriesPage() {
         </SubmitButton>
       </form>
 
-      <ul className="mt-8 grid gap-3 sm:grid-cols-2">
-        {categories.map((category) => (
-          <li
-            key={category.id}
-            className="flex items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--paper)] px-4 py-3"
-          >
-            <div>
-              <p>{category.name}</p>
-              <p className="text-sm text-[var(--muted)]">{category.kind}</p>
-            </div>
-            {canDeleteCategories ? (
-              usedCategoryIds.has(category.id) ? (
-                <span
-                  className="text-xs text-[var(--muted)]"
-                  title="Categories used by a transaction cannot be deleted"
-                >
-                  In use
-                </span>
-              ) : (
-                <form action={deleteCategory}>
-                  <input type="hidden" name="id" value={category.id} />
-                  <SubmitButton
-                    className="text-sm text-[var(--down)]"
-                    pendingLabel="Deleting…"
-                  >
-                    Delete
-                  </SubmitButton>
-                </form>
-              )
-            ) : null}
-          </li>
-        ))}
-      </ul>
+      <CategoryList
+        categories={categories}
+        usedCategoryIds={usedCategoryIds}
+        canDelete={canDeleteCategories}
+      />
     </div>
   );
 }
