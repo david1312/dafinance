@@ -1,3 +1,5 @@
+import { parseAmount } from "@/lib/amount-format";
+
 export const PAGE_SIZE = 20;
 
 export type TransactionFilterState = {
@@ -21,7 +23,7 @@ export function parseFilters(
       ? (params.get(key) ?? "")
       : (params[key] ?? "");
 
-  const amount = Number(read("amount").replaceAll(",", ""));
+  const amount = parseAmount(read("amount")) ?? 0;
 
   return {
     from: read("from"),

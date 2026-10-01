@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { parseAmount } from "@/lib/amount-format";
 import { ACCOUNT_KINDS, CURRENCIES, type AccountKind, type Currency } from "@/lib/currencies";
 import { DEFAULT_RESET_PASSWORD } from "@/lib/passwords";
 
@@ -25,8 +26,8 @@ function asKind(value: FormDataEntryValue | null): AccountKind | null {
 }
 
 function asAmount(value: FormDataEntryValue | null) {
-  const amount = Number(String(value ?? "").replaceAll(",", ""));
-  return Number.isFinite(amount) && amount > 0 ? amount : null;
+  const amount = parseAmount(value);
+  return amount !== null && amount > 0 ? amount : null;
 }
 
 async function findAuthUserIdByEmail(email: string) {
