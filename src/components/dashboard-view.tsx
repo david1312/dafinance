@@ -85,6 +85,16 @@ const EXPENSE_SECTIONS: SectionDef[] = [
     ],
   },
   {
+    id: "transport-travel",
+    label: "Transport & Travel",
+    icon: "🚗",
+    keywords: [
+      "transport", "travel", "commute", "toll", "parking",
+      "fuel", "petrol", "grab", "gojek", "taxi", "flight",
+      "hotel", "trip", "train", "bus",
+    ],
+  },
+  {
     id: "other-expense",
     label: "Other Expenses",
     icon: "📦",
