@@ -107,7 +107,7 @@ const INCOME_SECTIONS: SectionDef[] = [
     label: "Investment & Dividend",
     icon: "📈",
     keywords: [
-      "invest", "fund", "placement", "dividend", "divident",
+      "invest", "dividend", "divident",
       "capital gain", "capital", "stock", "bond", "interest", "mutual", "reksadana",
     ],
   },
