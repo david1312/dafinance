@@ -85,6 +85,16 @@ const EXPENSE_SECTIONS: SectionDef[] = [
     ],
   },
   {
+    id: "transport-travel",
+    label: "Transport & Travel",
+    icon: "🚗",
+    keywords: [
+      "transport", "travel", "commute", "toll", "parking",
+      "fuel", "petrol", "grab", "gojek", "taxi", "flight",
+      "hotel", "trip", "train", "bus",
+    ],
+  },
+  {
     id: "other-expense",
     label: "Other Expenses",
     icon: "📦",
@@ -107,7 +117,7 @@ const INCOME_SECTIONS: SectionDef[] = [
     label: "Investment & Dividend",
     icon: "📈",
     keywords: [
-      "invest", "dividend", "divident",
+      "inves", "dividend", "divident",
       "capital gain", "capital", "stock", "bond", "interest", "mutual", "reksadana",
     ],
   },
