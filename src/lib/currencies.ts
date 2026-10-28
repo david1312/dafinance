@@ -47,3 +47,10 @@ export function formatMoney(amount: number, currency: Currency) {
 
   return `${amount < 0 ? "-" : ""}${CURRENCY_PREFIX[currency]}${formatted}`;
 }
+
+/** "+Rp1,000.00" / "-Rp1,000.00" — net change always carries its sign. */
+export function formatSignedMoney(amount: number, currency: Currency) {
+  return amount > 0
+    ? `+${formatMoney(amount, currency)}`
+    : formatMoney(amount, currency);
+}

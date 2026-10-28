@@ -4,7 +4,10 @@ import type { Account, Category, Transaction } from "@/lib/types";
 export const REPORT_MAX_MONTHS = 3;
 
 export type ReportRow = {
+  id: string;
   occurredOn: string;
+  category: string;
+  note: string | null;
   description: string;
   kind: "income" | "expense";
   inAmount: number;
@@ -70,6 +73,11 @@ export function lastNMonths(count: number) {
   const startDate = new Date(now.getFullYear(), now.getMonth() - (count - 1), 1);
   const start = isoDate(startDate).slice(0, 7);
   return clampReportMonths(start, end);
+}
+
+/** Every month since tracking started — not limited to REPORT_MAX_MONTHS. */
+export function allTimeMonths() {
+  return { fromMonth: minMonthValue(), toMonth: currentMonthValue() };
 }
 
 export function lastCompleteMonth() {
@@ -150,7 +158,10 @@ export function buildAccountReport({
       : category;
 
     return {
+      id: transaction.id,
       occurredOn: transaction.occurred_on,
+      category,
+      note: transaction.note,
       description,
       kind: transaction.kind,
       inAmount,
@@ -169,4 +180,128 @@ export function buildAccountReport({
     totalOut,
     rows,
   };
+}
+
+export type OverviewRow = {
+  account: Account;
+  initialBalance: number;
+  totalIn: number;
+  totalOut: number;
+  closingBalance: number;
+  transactionCount: number;
+};
+
+export type OverviewCurrencyGroup = {
+  currency: Account["currency"];
+  rows: OverviewRow[];
+  initialBalance: number;
+  totalIn: number;
+  totalOut: number;
+  closingBalance: number;
+};
+
+export type AccountsOverview = {
+  from: string;
+  to: string;
+  groups: OverviewCurrencyGroup[];
+};
+
+/**
+ * Opening/closing balance for every account over [from, to]. Balances are in
+ * each account's own currency, so totals are grouped per currency.
+ */
+export function buildAccountsOverview({
+  accounts,
+  transactions,
+  from,
+  to,
+}: {
+  accounts: Account[];
+  transactions: Pick<
+    Transaction,
+    "account_id" | "amount" | "kind" | "occurred_on"
+  >[];
+  from: string;
+  to: string;
+}): AccountsOverview {
+  const rowByAccount = new Map<string, OverviewRow>(
+    accounts.map((account) => [
+      account.id,
+      {
+        account,
+        initialBalance: 0,
+        totalIn: 0,
+        totalOut: 0,
+        closingBalance: 0,
+        transactionCount: 0,
+      },
+    ]),
+  );
+
+  for (const transaction of transactions) {
+    const row = rowByAccount.get(transaction.account_id);
+    if (!row || transaction.occurred_on > to) continue;
+
+    if (transaction.occurred_on < from) {
+      row.initialBalance += signedAmount(transaction);
+    } else {
+      row.transactionCount += 1;
+      if (transaction.kind === "income") row.totalIn += transaction.amount;
+      else row.totalOut += transaction.amount;
+    }
+  }
+
+  const groupByCurrency = new Map<Account["currency"], OverviewCurrencyGroup>();
+
+  for (const row of rowByAccount.values()) {
+    row.closingBalance = row.initialBalance + row.totalIn - row.totalOut;
+
+    const currency = row.account.currency;
+    const group = groupByCurrency.get(currency) ?? {
+      currency,
+      rows: [],
+      initialBalance: 0,
+      totalIn: 0,
+      totalOut: 0,
+      closingBalance: 0,
+    };
+    group.rows.push(row);
+    group.initialBalance += row.initialBalance;
+    group.totalIn += row.totalIn;
+    group.totalOut += row.totalOut;
+    group.closingBalance += row.closingBalance;
+    groupByCurrency.set(currency, group);
+  }
+
+  const groups = [...groupByCurrency.values()]
+    .map((group) => ({
+      ...group,
+      rows: group.rows.sort((a, b) =>
+        a.account.name.localeCompare(b.account.name),
+      ),
+    }))
+    .sort((a, b) => b.rows.length - a.rows.length);
+
+  return { from, to, groups };
+}
+
+function formatDayLabel(value: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
+}
+
+/** "1 Oct 2026, 00:00" — the moment the opening balance is taken. */
+export function formatOpeningLabel(from: string) {
+  return `${formatDayLabel(from)}, 00:00`;
+}
+
+/** "31 Oct 2026, 23:59", or "29 Oct 2026, so far" while the day is not over. */
+export function formatClosingLabel(to: string) {
+  return to >= todayIso()
+    ? `${formatDayLabel(to)}, so far`
+    : `${formatDayLabel(to)}, 23:59`;
 }

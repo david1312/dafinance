@@ -15,8 +15,8 @@ export default async function ReportsPage() {
         Reports
       </h1>
       <p className="mt-1 max-w-2xl text-[var(--muted)]">
-        Generate an account statement for up to three months. The PDF opens in a
-        new tab with opening balance, running balance, and money in/out.
+        See how each account moved over a period: where the balance started,
+        where it ended, and whether you came out ahead.
       </p>
       <ReportBuilder
         accounts={(accounts ?? []) as Account[]}
