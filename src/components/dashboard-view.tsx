@@ -62,6 +62,8 @@ type CurrencySummary = {
   incomeTotal: number;
   expenseTotal: number;
   movements: MovementRow[];
+  /** Money in minus money out across transfers and investing. */
+  movementsNet: number;
 };
 
 /**
@@ -106,16 +108,21 @@ function summarizeCurrency(
 
   const incomeRows = sorted(income);
   const expenseRows = sorted(expense);
+  const movementRows = Object.values(movements);
 
   return {
     income: incomeRows,
     expense: expenseRows,
     incomeTotal: sum(incomeRows),
     expenseTotal: sum(expenseRows),
-    movements: Object.values(movements).sort(
+    movements: movementRows.sort(
       (a, b) =>
         a.bucket.localeCompare(b.bucket) ||
         b.inAmount + b.outAmount - (a.inAmount + a.outAmount),
+    ),
+    movementsNet: movementRows.reduce(
+      (total, row) => total + row.inAmount - row.outAmount,
+      0,
     ),
   };
 }
@@ -402,7 +409,10 @@ export function DashboardView({
             periodTransactions.filter((tx) => currencyOf(tx) === currency),
             categoryById,
           );
-          const net = summary.incomeTotal - summary.expenseTotal;
+          // Everything that touched the balances, so it tallies with the
+          // change in net worth and with the Reports page.
+          const net =
+            summary.incomeTotal - summary.expenseTotal + summary.movementsNet;
 
           return (
             <section key={currency} className="mt-10">
@@ -410,11 +420,13 @@ export function DashboardView({
                 {currency} cash flow · {rangeLabel}
               </h2>
               <p className="mt-1 text-xs text-[var(--muted)]">
-                Everyday income and spending only. Transfers between your
-                accounts, top-ups, and investing are kept separate below.
+                Income and Expenses count everyday money only. Fund
+                placements, top-ups, and investing have their own card, and
+                Net change adds everything up, so it matches how much your
+                balances moved.
               </p>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <SummaryCard label="Income">
                   <span className="text-[var(--up)]">
                     {formatMoney(summary.incomeTotal, currency)}
@@ -425,7 +437,21 @@ export function DashboardView({
                     {formatMoney(summary.expenseTotal, currency)}
                   </span>
                 </SummaryCard>
-                <SummaryCard emphasis label="Net" hint="Income minus expenses">
+                <SummaryCard
+                  label="Transfers & investing"
+                  hint="Fund placements, top-ups, investing"
+                >
+                  <span className={netChangeColor(summary.movementsNet)}>
+                    {summary.movementsNet === 0
+                      ? formatMoney(0, currency)
+                      : formatSignedMoney(summary.movementsNet, currency)}
+                  </span>
+                </SummaryCard>
+                <SummaryCard
+                  emphasis
+                  label="Net change"
+                  hint="Income − expenses ± transfers & investing"
+                >
                   <span className="flex flex-wrap items-center gap-2">
                     <span className={netChangeColor(net)}>
                       {formatSignedMoney(net, currency)}
@@ -530,33 +556,40 @@ function MovementsPanel({
   rows: MovementRow[];
   currency: Currency;
 }) {
-  const investingNet = rows
-    .filter((row) => row.bucket === "investing")
-    .reduce((total, row) => total + row.inAmount - row.outAmount, 0);
-  const hasInvesting = rows.some((row) => row.bucket === "investing");
+  const groupNets = MOVEMENT_GROUPS.flatMap((group) => {
+    const groupRows = rows.filter((row) => row.bucket === group.bucket);
+    if (groupRows.length === 0) return [];
+    const net = groupRows.reduce(
+      (total, row) => total + row.inAmount - row.outAmount,
+      0,
+    );
+    return [{ ...group, net }];
+  });
 
   return (
     <details className="group mt-4 rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 p-5">
         <div>
           <h3 className="font-medium text-[var(--ink)]">
             Transfers &amp; investing
           </h3>
           <p className="text-xs text-[var(--muted)]">
-            Not counted in income or expenses above.
+            Not in Income or Expenses, but included in Net change.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-3">
-          {hasInvesting ? (
-            <span className="text-right text-sm">
+        <div className="flex shrink-0 items-center gap-4">
+          {groupNets.map((group) => (
+            <span key={group.bucket} className="text-right text-sm">
               <span className="block text-xs text-[var(--muted)]">
-                Investing net
+                {group.label}
               </span>
-              <span className={netChangeColor(investingNet)}>
-                {formatSignedMoney(investingNet, currency)}
+              <span className={netChangeColor(group.net)}>
+                {group.net === 0
+                  ? "—"
+                  : formatSignedMoney(group.net, currency)}
               </span>
             </span>
-          ) : null}
+          ))}
           <span
             aria-hidden="true"
             className="text-lg text-[var(--accent-strong)] transition group-open:rotate-90"
