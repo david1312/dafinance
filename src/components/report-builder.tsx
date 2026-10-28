@@ -6,9 +6,13 @@ import { AccountsOverviewView } from "@/components/accounts-overview-view";
 import { SearchableAccountSelect } from "@/components/searchable-account-select";
 import { Spinner } from "@/components/spinner";
 import { createClient } from "@/lib/supabase/client";
-import { openAccountReportPdf } from "@/lib/account-report-pdf";
+import {
+  openAccountReportPdf,
+  openAccountsOverviewPdf,
+} from "@/lib/account-report-pdf";
 import {
   REPORT_MAX_MONTHS,
+  allTimeMonths,
   buildAccountReport,
   buildAccountsOverview,
   clampReportMonths,
@@ -36,7 +40,16 @@ const secondaryButtonClass =
 const PAGE_SIZE = 1000;
 
 type Mode = "statement" | "overview";
-type Action = "view" | "pdf" | "overview";
+type Action = "view" | "pdf" | "overview" | "overview-pdf";
+
+const PERIOD_PRESETS = [
+  { id: "this_month", label: "This month", months: () => lastNMonths(1) },
+  { id: "last_month", label: "Last month", months: lastCompleteMonth },
+  { id: "last_3_months", label: "Last 3 months", months: () => lastNMonths(3) },
+  { id: "all_time", label: "All time", months: allTimeMonths },
+] as const;
+
+type PeriodPreset = (typeof PERIOD_PRESETS)[number]["id"] | "custom";
 
 const MODES: { id: Mode; label: string; description: string }[] = [
   {
@@ -162,6 +175,7 @@ export function ReportBuilder({
   // Bumped when the account is picked from the overview, so the
   // uncontrolled account select remounts with the new value.
   const [accountSelectKey, setAccountSelectKey] = useState(0);
+  const [period, setPeriod] = useState<PeriodPreset>("this_month");
   const [fromMonth, setFromMonth] = useState(defaultMonths.fromMonth);
   const [toMonth, setToMonth] = useState(defaultMonths.toMonth);
   const [error, setError] = useState<string | null>(null);
@@ -179,18 +193,29 @@ export function ReportBuilder({
   const span = monthSpan(fromMonth, toMonth);
   const activeMode = MODES.find((item) => item.id === mode) ?? MODES[0];
 
+  const allTime = period === "all_time";
+
   function applyMonths(nextFrom: string, nextTo: string) {
     const clamped = clampReportMonths(nextFrom, nextTo);
+    setPeriod("custom");
     setFromMonth(clamped.fromMonth);
     setToMonth(clamped.toMonth);
   }
 
+  function selectPreset(preset: (typeof PERIOD_PRESETS)[number]) {
+    const months = preset.months();
+    setPeriod(preset.id);
+    setFromMonth(months.fromMonth);
+    setToMonth(months.toMonth);
+  }
+
   function run(action: Action, account: Account | null = selectedAccount) {
-    if (action !== "overview" && !account) {
+    const isOverview = action === "overview" || action === "overview-pdf";
+    if (!isOverview && !account) {
       setError("Select an account first.");
       return;
     }
-    if (span > REPORT_MAX_MONTHS) {
+    if (!allTime && span > REPORT_MAX_MONTHS) {
       setError(`Period cannot be longer than ${REPORT_MAX_MONTHS} months.`);
       return;
     }
@@ -202,8 +227,13 @@ export function ReportBuilder({
     startTransition(async () => {
       setError(null);
       try {
-        if (action === "overview") {
-          setOverview(await loadAccountsOverview(accounts, from, to));
+        if (isOverview) {
+          const result = await loadAccountsOverview(accounts, from, to);
+          setOverview(result);
+          if (action === "overview-pdf") {
+            openAccountsOverviewPdf(result);
+            return;
+          }
         } else if (account) {
           const report = await loadAccountReport(account, categories, from, to);
           if (action === "pdf") {
@@ -302,36 +332,20 @@ export function ReportBuilder({
           ) : null}
 
           <div className="flex flex-wrap gap-2">
-            <button
-              className="rounded-full border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] transition hover:border-[var(--accent)]"
-              type="button"
-              onClick={() => {
-                const range = lastNMonths(1);
-                applyMonths(range.fromMonth, range.toMonth);
-              }}
-            >
-              This month
-            </button>
-            <button
-              className="rounded-full border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] transition hover:border-[var(--accent)]"
-              type="button"
-              onClick={() => {
-                const range = lastCompleteMonth();
-                applyMonths(range.fromMonth, range.toMonth);
-              }}
-            >
-              Last month
-            </button>
-            <button
-              className="rounded-full border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] transition hover:border-[var(--accent)]"
-              type="button"
-              onClick={() => {
-                const range = lastNMonths(3);
-                applyMonths(range.fromMonth, range.toMonth);
-              }}
-            >
-              Last 3 months
-            </button>
+            {PERIOD_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                className={`rounded-full border px-3 py-1.5 text-sm transition ${
+                  period === preset.id
+                    ? "border-[var(--accent-strong)] bg-[var(--accent-soft)] text-[var(--accent-strong)]"
+                    : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--accent)]"
+                }`}
+                type="button"
+                onClick={() => selectPreset(preset)}
+              >
+                {preset.label}
+              </button>
+            ))}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -360,9 +374,11 @@ export function ReportBuilder({
           </div>
 
           <p className="text-xs text-[var(--muted)]">
-            {span} month{span > 1 ? "s" : ""} selected. Opening balance is taken
-            at 00:00 on the first day, closing balance at 23:59 on the last day.
-            Maximum is {REPORT_MAX_MONTHS} months.
+            {allTime
+              ? `All time: every month since tracking started (${span} month${span > 1 ? "s" : ""}).`
+              : `${span} month${span > 1 ? "s" : ""} selected. Maximum is ${REPORT_MAX_MONTHS} months, or pick All time.`}{" "}
+            Opening balance is taken at 00:00 on the first day, closing balance
+            at 23:59 on the last day.
           </p>
 
           {error ? <p className="text-sm text-[var(--down)]">{error}</p> : null}
@@ -388,14 +404,24 @@ export function ReportBuilder({
                 </button>
               </>
             ) : (
-              <button
-                className={primaryButtonClass}
-                disabled={isPending}
-                type="button"
-                onClick={() => run("overview")}
-              >
-                {busyLabel("overview", "View overview", "Loading…")}
-              </button>
+              <>
+                <button
+                  className={primaryButtonClass}
+                  disabled={isPending}
+                  type="button"
+                  onClick={() => run("overview")}
+                >
+                  {busyLabel("overview", "View overview", "Loading…")}
+                </button>
+                <button
+                  className={secondaryButtonClass}
+                  disabled={isPending}
+                  type="button"
+                  onClick={() => run("overview-pdf")}
+                >
+                  {busyLabel("overview-pdf", "Download PDF", "Generating…")}
+                </button>
+              </>
             )}
           </div>
         </div>

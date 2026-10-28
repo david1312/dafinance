@@ -1,10 +1,13 @@
 import {
   NetChangeBadge,
   SummaryCard,
-  formatSignedMoney,
   netChangeColor,
 } from "@/components/report-summary";
-import { accountKindLabel, formatMoney } from "@/lib/currencies";
+import {
+  accountKindLabel,
+  formatMoney,
+  formatSignedMoney,
+} from "@/lib/currencies";
 import {
   formatClosingLabel,
   formatOpeningLabel,

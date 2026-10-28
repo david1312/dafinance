@@ -9,6 +9,7 @@ export const RANGE_PRESETS = [
   { id: "last_3_months", label: "Last 3 months" },
   { id: "last_6_months", label: "Last 6 months" },
   { id: "this_year", label: "This year" },
+  { id: "all_time", label: "All time" },
   { id: "custom", label: "Custom range" },
 ] as const;
 
@@ -89,6 +90,9 @@ export function rangeForPreset(
     to = today;
   } else if (preset === "this_year") {
     from = isoDate(new Date(now.getFullYear(), 0, 1));
+    to = today;
+  } else if (preset === "all_time") {
+    from = DASHBOARD_MIN_DATE;
     to = today;
   } else {
     from = customFrom || DASHBOARD_MIN_DATE;

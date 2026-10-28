@@ -75,6 +75,11 @@ export function lastNMonths(count: number) {
   return clampReportMonths(start, end);
 }
 
+/** Every month since tracking started — not limited to REPORT_MAX_MONTHS. */
+export function allTimeMonths() {
+  return { fromMonth: minMonthValue(), toMonth: currentMonthValue() };
+}
+
 export function lastCompleteMonth() {
   const now = new Date();
   const previous = isoDate(new Date(now.getFullYear(), now.getMonth() - 1, 1)).slice(

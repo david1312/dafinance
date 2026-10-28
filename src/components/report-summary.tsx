@@ -1,12 +1,4 @@
 import type { ReactNode } from "react";
-import { formatMoney, type Currency } from "@/lib/currencies";
-
-/** "+Rp1,000.00" / "-Rp1,000.00" — net change always carries its sign. */
-export function formatSignedMoney(amount: number, currency: Currency) {
-  return amount > 0
-    ? `+${formatMoney(amount, currency)}`
-    : formatMoney(amount, currency);
-}
 
 export function netChangeColor(amount: number) {
   if (amount > 0) return "text-[var(--up)]";
