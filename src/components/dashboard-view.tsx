@@ -1,12 +1,19 @@
 "use client";
 
-import { type Dispatch, type SetStateAction, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import { CategoryDonut, type DonutSlice } from "@/components/category-donut";
+import {
+  NetChangeBadge,
+  SummaryCard,
+  netChangeColor,
+} from "@/components/report-summary";
 import { SearchableAccountSelect } from "@/components/searchable-account-select";
+import { categoryBucket, type CategoryBucket } from "@/lib/category-buckets";
 import {
   CURRENCIES,
   formatMoney,
+  formatSignedMoney,
   type Currency,
 } from "@/lib/currencies";
 import {
@@ -33,135 +40,110 @@ const INCOME_PALETTE = [
   "#6fae8b", "#93c7a6", "#4f8f6c", "#bfe0cc", "#7fb9a2", "#5aa383", "#a8d4ba",
 ];
 
-const UNCATEGORIZED = "__uncategorized__";
-
-// ---------------------------------------------------------------------------
-// Section definitions
-// ---------------------------------------------------------------------------
-
-type SectionDef = {
-  id: string;
-  label: string;
-  icon: string;
-  /** Category name keywords (case-insensitive). Empty array = catch-all. */
-  keywords: string[];
-};
-
-const EXPENSE_SECTIONS: SectionDef[] = [
-  {
-    id: "food-shopping",
-    label: "Food, Groceries & Shopping",
-    icon: "🛒",
-    keywords: [
-      "food", "grocer", "shopping", "market", "restaurant",
-      "dining", "eat", "meal", "beverage", "drink", "cafe",
-    ],
-  },
-  {
-    id: "investment",
-    label: "Investment & Fund Placement",
-    icon: "📉",
-    keywords: [
-      "invest", "fund", "placement", "capital loss", "capital",
-      "stock", "bond", "mutual", "reksadana",
-    ],
-  },
-  {
-    id: "reward-gift",
-    label: "Self Reward & Gifts",
-    icon: "🎁",
-    keywords: [
-      "reward", "gift", "hobby", "entertainment", "luxury",
-      "beauty", "spa", "fashion", "clothing", "apparel",
-    ],
-  },
-  {
-    id: "housing",
-    label: "Housing",
-    icon: "🏠",
-    keywords: [
-      "housing", "mortgage", "property", "utility", "utilities",
-      "electric", "water", "internet", "subscription",
-    ],
-  },
-  {
-    id: "transport-travel",
-    label: "Transport & Travel",
-    icon: "🚗",
-    keywords: [
-      "transport", "travel", "commute", "toll", "parking",
-      "fuel", "petrol", "grab", "gojek", "taxi", "flight",
-      "hotel", "trip", "train", "bus",
-    ],
-  },
-  {
-    id: "other-expense",
-    label: "Other Expenses",
-    icon: "📦",
-    keywords: [],
-  },
-];
-
-const INCOME_SECTIONS: SectionDef[] = [
-  {
-    id: "regular",
-    label: "Salary, Rent & Freelance",
-    icon: "💼",
-    keywords: [
-      "salary", "wage", "freelance", "cashback", "rental",
-      "rent", "allowance", "bonus", "gaji",
-    ],
-  },
-  {
-    id: "investment-income",
-    label: "Investment & Dividend",
-    icon: "📈",
-    keywords: [
-      "invest", "dividend", "divident",
-      "capital gain", "capital", "stock", "bond", "interest", "mutual", "reksadana",
-    ],
-  },
-  {
-    id: "other-income",
-    label: "Other Income",
-    icon: "💰",
-    keywords: [],
-  },
-];
+/** Donut slices beyond this are folded into "Other" (palette has 7 colours). */
+const MAX_SLICES = 6;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getSectionId(categoryName: string, sections: SectionDef[]): string {
-  const name = categoryName.toLowerCase();
-  for (const section of sections) {
-    if (section.keywords.length === 0) continue;
-    if (section.keywords.some((kw) => name.includes(kw.toLowerCase()))) {
-      return section.id;
+type CategoryTotal = { name: string; value: number };
+
+type MovementRow = {
+  name: string;
+  bucket: Exclude<CategoryBucket, "everyday">;
+  inAmount: number;
+  outAmount: number;
+};
+
+type CurrencySummary = {
+  income: CategoryTotal[];
+  expense: CategoryTotal[];
+  incomeTotal: number;
+  expenseTotal: number;
+  movements: MovementRow[];
+  /** Money in minus money out across transfers and investing. */
+  movementsNet: number;
+};
+
+/**
+ * Splits a currency's transactions into everyday income/expense (per
+ * category) and transfers/investing (per category, money in vs out).
+ */
+function summarizeCurrency(
+  transactions: Transaction[],
+  categoryById: Record<string, Category>,
+): CurrencySummary {
+  const income: Record<string, number> = {};
+  const expense: Record<string, number> = {};
+  const movements: Record<string, MovementRow> = {};
+
+  for (const tx of transactions) {
+    const category = tx.category_id ? categoryById[tx.category_id] : undefined;
+    const name = category?.name ?? "Uncategorized";
+    const bucket = categoryBucket(category);
+
+    if (bucket === "everyday") {
+      const totals = tx.kind === "income" ? income : expense;
+      totals[name] = (totals[name] ?? 0) + tx.amount;
+      continue;
     }
+
+    const row = (movements[name] ??= {
+      name,
+      bucket,
+      inAmount: 0,
+      outAmount: 0,
+    });
+    if (tx.kind === "income") row.inAmount += tx.amount;
+    else row.outAmount += tx.amount;
   }
-  // Last section is always the catch-all
-  return sections[sections.length - 1].id;
+
+  const sorted = (totals: Record<string, number>) =>
+    Object.entries(totals)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  const sum = (totals: CategoryTotal[]) =>
+    totals.reduce((total, row) => total + row.value, 0);
+
+  const incomeRows = sorted(income);
+  const expenseRows = sorted(expense);
+  const movementRows = Object.values(movements);
+
+  return {
+    income: incomeRows,
+    expense: expenseRows,
+    incomeTotal: sum(incomeRows),
+    expenseTotal: sum(expenseRows),
+    movements: movementRows.sort(
+      (a, b) =>
+        a.bucket.localeCompare(b.bucket) ||
+        b.inAmount + b.outAmount - (a.inAmount + a.outAmount),
+    ),
+    movementsNet: movementRows.reduce(
+      (total, row) => total + row.inAmount - row.outAmount,
+      0,
+    ),
+  };
 }
 
-function buildCategoriesBySection(
-  categories: Category[],
-  sections: SectionDef[],
-): Record<string, Array<{ id: string; name: string }>> {
-  const result: Record<string, Array<{ id: string; name: string }>> = {};
-  for (const section of sections) result[section.id] = [];
-
-  for (const cat of categories) {
-    const sid = getSectionId(cat.name, sections);
-    result[sid].push({ id: cat.id, name: cat.name });
+function toSlices(totals: CategoryTotal[], currency: Currency): DonutSlice[] {
+  const top =
+    totals.length > MAX_SLICES + 1 ? totals.slice(0, MAX_SLICES) : totals;
+  const rest = totals.slice(top.length);
+  const slices = top.map((row) => ({
+    ...row,
+    display: formatMoney(row.value, currency),
+  }));
+  if (rest.length > 0) {
+    const value = rest.reduce((total, row) => total + row.value, 0);
+    slices.push({
+      name: `Other (${rest.length} categories)`,
+      value,
+      display: formatMoney(value, currency),
+    });
   }
-
-  // Always add "Uncategorized" chip to the catch-all section
-  const catchAllId = sections[sections.length - 1].id;
-  result[catchAllId].push({ id: UNCATEGORIZED, name: "Uncategorized" });
-
-  return result;
+  return slices;
 }
 
 // ---------------------------------------------------------------------------
@@ -185,11 +167,6 @@ export function DashboardView({
   const [accountId, setAccountId] = useState("");
   const [netWorthExpanded, setNetWorthExpanded] = useState(false);
 
-  // Per-section chip selection: { [sectionId]: string[] of selected category IDs }
-  // Empty array = "show all in section"
-  const [expSel, setExpSel] = useState<Record<string, string[]>>({});
-  const [incSel, setIncSel] = useState<Record<string, string[]>>({});
-
   const { from, to } = rangeForPreset(preset, customFrom, customTo);
   const rangeLabel = formatRangeLabel(from, to);
   const maxDate = todayIso();
@@ -201,24 +178,6 @@ export function DashboardView({
   const categoryById = useMemo(
     () => Object.fromEntries(categories.map((c) => [c.id, c])),
     [categories],
-  );
-
-  const expenseCategories = useMemo(
-    () => categories.filter((c) => c.kind === "expense"),
-    [categories],
-  );
-  const incomeCategories = useMemo(
-    () => categories.filter((c) => c.kind === "income"),
-    [categories],
-  );
-
-  const expCatsBySection = useMemo(
-    () => buildCategoriesBySection(expenseCategories, EXPENSE_SECTIONS),
-    [expenseCategories],
-  );
-  const incCatsBySection = useMemo(
-    () => buildCategoriesBySection(incomeCategories, INCOME_SECTIONS),
-    [incomeCategories],
   );
 
   const periodTransactions = useMemo(
@@ -260,62 +219,6 @@ export function DashboardView({
   const chartCurrencies = CURRENCIES.filter((currency) =>
     periodTransactions.some((tx) => currencyOf(tx) === currency),
   );
-
-  // Compute donut slices for a given section, respecting per-section chip selection
-  function slicesForSection(
-    kind: "income" | "expense",
-    currency: Currency,
-    sectionCats: Array<{ id: string; name: string }>,
-    selected: string[],
-  ): DonutSlice[] {
-    const allIds = sectionCats.map((c) => c.id);
-    const activeIds = selected.length > 0 ? selected : allIds;
-
-    const totals = periodTransactions
-      .filter((tx) => {
-        const catId = tx.category_id ?? UNCATEGORIZED;
-        return (
-          tx.kind === kind &&
-          currencyOf(tx) === currency &&
-          activeIds.includes(catId)
-        );
-      })
-      .reduce<Record<string, number>>((acc, tx) => {
-        const label = tx.category_id
-          ? (categoryById[tx.category_id]?.name ?? "Uncategorized")
-          : "Uncategorized";
-        acc[label] = (acc[label] ?? 0) + tx.amount;
-        return acc;
-      }, {});
-
-    return Object.entries(totals)
-      .map(([name, value]) => ({
-        name,
-        value,
-        display: formatMoney(value, currency),
-      }))
-      .sort((a, b) => b.value - a.value);
-  }
-
-  function toggleChip(
-    sel: Record<string, string[]>,
-    setSel: Dispatch<SetStateAction<Record<string, string[]>>>,
-    sectionId: string,
-    chipId: string,
-  ) {
-    const current = sel[sectionId] ?? [];
-    const next = current.includes(chipId)
-      ? current.filter((x) => x !== chipId)
-      : [...current, chipId];
-    setSel((prev) => ({ ...prev, [sectionId]: next }));
-  }
-
-  function clearSection(
-    setSel: Dispatch<SetStateAction<Record<string, string[]>>>,
-    sectionId: string,
-  ) {
-    setSel((prev) => ({ ...prev, [sectionId]: [] }));
-  }
 
   return (
     <div className="relative">
@@ -494,7 +397,7 @@ export function DashboardView({
       ) : null}
 
       {/* ------------------------------------------------------------------ */}
-      {/* Per-currency section breakdown                                       */}
+      {/* Per-currency cash flow                                               */}
       {/* ------------------------------------------------------------------ */}
       {chartCurrencies.length === 0 ? (
         <p className="mt-10 text-[var(--muted)]">
@@ -502,115 +405,85 @@ export function DashboardView({
         </p>
       ) : (
         chartCurrencies.map((currency) => {
-          const expenseTotal = periodTransactions
-            .filter((tx) => tx.kind === "expense" && currencyOf(tx) === currency)
-            .reduce((s, tx) => s + tx.amount, 0);
-          const incomeTotal = periodTransactions
-            .filter((tx) => tx.kind === "income" && currencyOf(tx) === currency)
-            .reduce((s, tx) => s + tx.amount, 0);
+          const summary = summarizeCurrency(
+            periodTransactions.filter((tx) => currencyOf(tx) === currency),
+            categoryById,
+          );
+          // Everything that touched the balances, so it tallies with the
+          // change in net worth and with the Reports page.
+          const net =
+            summary.incomeTotal - summary.expenseTotal + summary.movementsNet;
 
           return (
             <section key={currency} className="mt-10">
               <h2 className="text-sm tracking-[0.14em] text-[var(--muted)] uppercase">
-                {currency} · {rangeLabel}
+                {currency} cash flow · {rangeLabel}
               </h2>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                Income and Expenses count everyday money only. Fund
+                placements, top-ups, and investing have their own card, and
+                Net change adds everything up, so it matches how much your
+                balances moved.
+              </p>
 
-              {/* ---- Expenses ---- */}
-              {expenseTotal > 0 && (
-                <div className="mt-5">
-                  <div className="flex items-baseline gap-2">
-                    <h3 className="font-medium text-[var(--ink)]">Expenses</h3>
-                    <span className="text-sm text-[var(--down)]">
-                      {formatMoney(expenseTotal, currency)} total
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <SummaryCard label="Income">
+                  <span className="text-[var(--up)]">
+                    {formatMoney(summary.incomeTotal, currency)}
+                  </span>
+                </SummaryCard>
+                <SummaryCard label="Expenses">
+                  <span className="text-[var(--down)]">
+                    {formatMoney(summary.expenseTotal, currency)}
+                  </span>
+                </SummaryCard>
+                <SummaryCard
+                  label="Transfers & investing"
+                  hint="Fund placements, top-ups, investing"
+                >
+                  <span className={netChangeColor(summary.movementsNet)}>
+                    {summary.movementsNet === 0
+                      ? formatMoney(0, currency)
+                      : formatSignedMoney(summary.movementsNet, currency)}
+                  </span>
+                </SummaryCard>
+                <SummaryCard
+                  emphasis
+                  label="Net change"
+                  hint="Income − expenses ± transfers & investing"
+                >
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className={netChangeColor(net)}>
+                      {formatSignedMoney(net, currency)}
                     </span>
-                  </div>
-                  <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                    {EXPENSE_SECTIONS.map((section) => {
-                      const sectionCats = expCatsBySection[section.id] ?? [];
-                      if (sectionCats.length === 0) return null;
-                      const selected = expSel[section.id] ?? [];
-                      const slices = slicesForSection(
-                        "expense",
-                        currency,
-                        sectionCats,
-                        selected,
-                      );
-                      const sectionTotal = slices.reduce(
-                        (s, sl) => s + sl.value,
-                        0,
-                      );
-                      // Hide section if it has no activity and user hasn't manually filtered it
-                      if (sectionTotal === 0 && selected.length === 0) return null;
+                    <NetChangeBadge amount={net} />
+                  </span>
+                </SummaryCard>
+              </div>
 
-                      return (
-                        <SectionCard
-                          key={section.id}
-                          section={section}
-                          kind="expense"
-                          palette={EXPENSE_PALETTE}
-                          sectionCategories={sectionCats}
-                          selected={selected}
-                          slices={slices}
-                          sectionTotal={sectionTotal}
-                          currency={currency}
-                          onToggle={(id) =>
-                            toggleChip(expSel, setExpSel, section.id, id)
-                          }
-                          onClear={() => clearSection(setExpSel, section.id)}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                <BreakdownCard
+                  currency={currency}
+                  kind="expense"
+                  rows={summary.expense}
+                  title="Where the money went"
+                  total={summary.expenseTotal}
+                />
+                <BreakdownCard
+                  currency={currency}
+                  kind="income"
+                  rows={summary.income}
+                  title="Where it came from"
+                  total={summary.incomeTotal}
+                />
+              </div>
 
-              {/* ---- Income ---- */}
-              {incomeTotal > 0 && (
-                <div className="mt-8">
-                  <div className="flex items-baseline gap-2">
-                    <h3 className="font-medium text-[var(--ink)]">Income</h3>
-                    <span className="text-sm text-[var(--up)]">
-                      {formatMoney(incomeTotal, currency)} total
-                    </span>
-                  </div>
-                  <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                    {INCOME_SECTIONS.map((section) => {
-                      const sectionCats = incCatsBySection[section.id] ?? [];
-                      if (sectionCats.length === 0) return null;
-                      const selected = incSel[section.id] ?? [];
-                      const slices = slicesForSection(
-                        "income",
-                        currency,
-                        sectionCats,
-                        selected,
-                      );
-                      const sectionTotal = slices.reduce(
-                        (s, sl) => s + sl.value,
-                        0,
-                      );
-                      if (sectionTotal === 0 && selected.length === 0) return null;
-
-                      return (
-                        <SectionCard
-                          key={section.id}
-                          section={section}
-                          kind="income"
-                          palette={INCOME_PALETTE}
-                          sectionCategories={sectionCats}
-                          selected={selected}
-                          slices={slices}
-                          sectionTotal={sectionTotal}
-                          currency={currency}
-                          onToggle={(id) =>
-                            toggleChip(incSel, setIncSel, section.id, id)
-                          }
-                          onClear={() => clearSection(setIncSel, section.id)}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              {summary.movements.length > 0 ? (
+                <MovementsPanel
+                  currency={currency}
+                  rows={summary.movements}
+                />
+              ) : null}
             </section>
           );
         })
@@ -620,99 +493,167 @@ export function DashboardView({
 }
 
 // ---------------------------------------------------------------------------
-// SectionCard
+// BreakdownCard
 // ---------------------------------------------------------------------------
 
-function SectionCard({
-  section,
+function BreakdownCard({
+  title,
   kind,
-  palette,
-  sectionCategories,
-  selected,
-  slices,
-  sectionTotal,
+  rows,
+  total,
   currency,
-  onToggle,
-  onClear,
 }: {
-  section: SectionDef;
+  title: string;
   kind: "income" | "expense";
-  palette: string[];
-  sectionCategories: Array<{ id: string; name: string }>;
-  selected: string[];
-  slices: DonutSlice[];
-  sectionTotal: number;
+  rows: CategoryTotal[];
+  total: number;
   currency: Currency;
-  onToggle: (id: string) => void;
-  onClear: () => void;
 }) {
-  const amountColorClass =
-    kind === "expense" ? "text-[var(--down)]" : "text-[var(--up)]";
-
-  const chipActiveClass =
-    kind === "expense"
-      ? "border-[var(--down)] bg-[var(--accent-soft)] text-[var(--down)]"
-      : "border-[var(--up)] bg-[#edf8f1] text-[var(--up)]";
-
   return (
     <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5">
-      {/* Header: icon + label + section total */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 text-base" aria-hidden="true">
-            {section.icon}
-          </span>
-          <h4 className="truncate text-sm font-medium text-[var(--ink)]">
-            {section.label}
-          </h4>
-        </div>
-        {sectionTotal > 0 && (
-          <p className={`shrink-0 text-sm font-medium ${amountColorClass}`}>
-            {formatMoney(sectionTotal, currency)}
-          </p>
-        )}
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="font-medium text-[var(--ink)]">{title}</h3>
+        <p className="shrink-0 text-sm text-[var(--muted)]">
+          {rows.length} categor{rows.length === 1 ? "y" : "ies"}
+        </p>
       </div>
-
-      {/* Category chips */}
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {sectionCategories.map((cat) => {
-          const isActive = selected.length === 0 || selected.includes(cat.id);
-          return (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => onToggle(cat.id)}
-              className={`rounded-full border px-2.5 py-1 text-xs transition ${
-                isActive
-                  ? chipActiveClass
-                  : "border-[var(--line)] text-[var(--muted)]"
-              } ${selected.length > 0 && !isActive ? "opacity-40" : ""}`}
-            >
-              {cat.name}
-            </button>
-          );
-        })}
-        {selected.length > 0 && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="rounded-full border border-dashed border-[var(--accent-strong)] px-2.5 py-1 text-xs text-[var(--accent-strong)] transition hover:bg-[var(--accent-soft)]"
-          >
-            Show all
-          </button>
-        )}
-      </div>
-
-      {/* Donut chart */}
       <CategoryDonut
-        slices={slices}
-        palette={palette}
-        emptyLabel={`No ${currency} ${kind} for selected categories.`}
-        centerLabel={`${currency} ${kind}`}
-        totalDisplay={
-          sectionTotal > 0 ? formatMoney(sectionTotal, currency) : undefined
-        }
+        slices={toSlices(rows, currency)}
+        palette={kind === "expense" ? EXPENSE_PALETTE : INCOME_PALETTE}
+        emptyLabel={`No ${kind === "expense" ? "spending" : "income"} in this period.`}
+        centerLabel={kind === "expense" ? "Spent" : "Earned"}
+        totalDisplay={total > 0 ? formatMoney(total, currency) : undefined}
       />
     </article>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MovementsPanel
+// ---------------------------------------------------------------------------
+
+const MOVEMENT_GROUPS: {
+  bucket: MovementRow["bucket"];
+  label: string;
+  hint: string;
+}[] = [
+  {
+    bucket: "transfer",
+    label: "Between your accounts",
+    hint: "Fund placements and top-ups. What leaves one account lands in another.",
+  },
+  {
+    bucket: "investing",
+    label: "Investing",
+    hint: "Money put into investments and the returns that came back.",
+  },
+];
+
+function MovementsPanel({
+  rows,
+  currency,
+}: {
+  rows: MovementRow[];
+  currency: Currency;
+}) {
+  const groupNets = MOVEMENT_GROUPS.flatMap((group) => {
+    const groupRows = rows.filter((row) => row.bucket === group.bucket);
+    if (groupRows.length === 0) return [];
+    const net = groupRows.reduce(
+      (total, row) => total + row.inAmount - row.outAmount,
+      0,
+    );
+    return [{ ...group, net }];
+  });
+
+  return (
+    <details className="group mt-4 rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 p-5">
+        <div>
+          <h3 className="font-medium text-[var(--ink)]">
+            Transfers &amp; investing
+          </h3>
+          <p className="text-xs text-[var(--muted)]">
+            Not in Income or Expenses, but included in Net change.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-4">
+          {groupNets.map((group) => (
+            <span key={group.bucket} className="text-right text-sm">
+              <span className="block text-xs text-[var(--muted)]">
+                {group.label}
+              </span>
+              <span className={netChangeColor(group.net)}>
+                {group.net === 0
+                  ? "—"
+                  : formatSignedMoney(group.net, currency)}
+              </span>
+            </span>
+          ))}
+          <span
+            aria-hidden="true"
+            className="text-lg text-[var(--accent-strong)] transition group-open:rotate-90"
+          >
+            &gt;
+          </span>
+        </div>
+      </summary>
+
+      <div className="overflow-x-auto border-t border-[var(--line)]">
+        <table className="w-full min-w-[560px] border-collapse text-left text-sm">
+          <thead className="text-[var(--muted)]">
+            <tr>
+              <th className="px-5 py-3 font-medium">Category</th>
+              <th className="px-5 py-3 text-right font-medium">In</th>
+              <th className="px-5 py-3 text-right font-medium">Out</th>
+              <th className="px-5 py-3 text-right font-medium">Net</th>
+            </tr>
+          </thead>
+          {MOVEMENT_GROUPS.map((group) => {
+            const groupRows = rows.filter((row) => row.bucket === group.bucket);
+            if (groupRows.length === 0) return null;
+
+            return (
+              <tbody key={group.bucket} className="tabular-nums">
+                <tr className="border-t border-[var(--line)] bg-[var(--bg)]">
+                  <td className="px-5 py-2" colSpan={4}>
+                    <span className="text-xs font-medium tracking-wide text-[var(--ink)] uppercase">
+                      {group.label}
+                    </span>
+                    <span className="ml-2 text-xs text-[var(--muted)]">
+                      {group.hint}
+                    </span>
+                  </td>
+                </tr>
+                {groupRows.map((row) => {
+                  const rowNet = row.inAmount - row.outAmount;
+                  return (
+                    <tr
+                      key={row.name}
+                      className="border-t border-[var(--line)]"
+                    >
+                      <td className="px-5 py-3">{row.name}</td>
+                      <td className="whitespace-nowrap px-5 py-3 text-right text-[var(--up)]">
+                        {row.inAmount ? formatMoney(row.inAmount, currency) : ""}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-right text-[var(--down)]">
+                        {row.outAmount
+                          ? formatMoney(row.outAmount, currency)
+                          : ""}
+                      </td>
+                      <td
+                        className={`whitespace-nowrap px-5 py-3 text-right ${netChangeColor(rowNet)}`}
+                      >
+                        {rowNet === 0 ? "—" : formatSignedMoney(rowNet, currency)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            );
+          })}
+        </table>
+      </div>
+    </details>
   );
 }
