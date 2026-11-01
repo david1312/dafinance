@@ -39,10 +39,14 @@ const CURRENCY_PREFIX: Record<Currency, string> = {
   JPY: "¥",
 };
 
-export function formatMoney(amount: number, currency: Currency) {
+export function formatMoney(
+  amount: number,
+  currency: Currency,
+  fractionDigits = 2,
+) {
   const formatted = new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   }).format(Math.abs(amount));
 
   return `${amount < 0 ? "-" : ""}${CURRENCY_PREFIX[currency]}${formatted}`;

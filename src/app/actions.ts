@@ -6,7 +6,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseAmount } from "@/lib/amount-format";
 import { ACCOUNT_KINDS, CURRENCIES, type AccountKind, type Currency } from "@/lib/currencies";
+import { fetchDailyRates } from "@/lib/fx";
 import { DEFAULT_RESET_PASSWORD } from "@/lib/passwords";
+import { syncSavedRates } from "@/lib/saved-rates";
 
 export type MemberActionState = {
   status: "idle" | "success" | "error";
@@ -384,6 +386,28 @@ export async function upsertRate(formData: FormData) {
   );
 
   if (error) return;
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+}
+
+/** Saved rates → latest ECB day. The dashboard also does this when stale. */
+export async function refreshRatesFromEcb() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+  const daily = await fetchDailyRates("JPY", weekAgo);
+  if (!daily) return;
+
+  const { data: existing } = await supabase
+    .from("exchange_rates")
+    .select("from_currency, to_currency");
+  const saved = await syncSavedRates(supabase, user.id, daily, existing ?? []);
+
+  if (!saved) return;
   revalidatePath("/settings");
   revalidatePath("/dashboard");
 }
