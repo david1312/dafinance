@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
+import { BudgetTracker } from "@/components/budget-tracker";
 import { CategoryDonut, type DonutSlice } from "@/components/category-donut";
 import {
   NetChangeBadge,
@@ -10,7 +11,9 @@ import {
 } from "@/components/report-summary";
 import { SearchableAccountSelect } from "@/components/searchable-account-select";
 import { categoryBucket, type CategoryBucket } from "@/lib/category-buckets";
+import { BUDGET_CURRENCY } from "@/lib/budgets";
 import {
+  BASE_CURRENCY,
   CURRENCIES,
   formatMoney,
   formatSignedMoney,
@@ -26,6 +29,8 @@ import {
   todayIso,
   type RangePreset,
 } from "@/lib/dashboard-range";
+import { latestRate, type DailyRates } from "@/lib/fx";
+import type { RateRow } from "@/lib/money";
 import type { Account, Category, Transaction } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -154,12 +159,16 @@ type DashboardViewProps = {
   accounts: Account[];
   categories: Category[];
   transactions: Transaction[];
+  dailyRates: DailyRates | null;
+  manualRates: RateRow[];
 };
 
 export function DashboardView({
   accounts,
   categories,
   transactions,
+  dailyRates,
+  manualRates,
 }: DashboardViewProps) {
   const [preset, setPreset] = useState<RangePreset>("this_month");
   const [customFrom, setCustomFrom] = useState(DASHBOARD_MIN_DATE);
@@ -170,6 +179,12 @@ export function DashboardView({
   const { from, to } = rangeForPreset(preset, customFrom, customTo);
   const rangeLabel = formatRangeLabel(from, to);
   const maxDate = todayIso();
+  const headlineRate = latestRate(
+    BUDGET_CURRENCY,
+    BASE_CURRENCY,
+    dailyRates,
+    manualRates,
+  );
 
   const accountById = useMemo(
     () => Object.fromEntries(accounts.map((a) => [a.id, a])),
@@ -239,6 +254,29 @@ export function DashboardView({
       <p className="mt-1 text-[var(--muted)]">
         {rangeLabel}. Amounts stay in each account&rsquo;s own currency.
       </p>
+      {headlineRate ? (
+        <p className="mt-3 inline-flex flex-wrap items-baseline gap-x-2 rounded-full border border-[var(--line)] bg-[var(--paper)] px-3 py-1 text-sm">
+          <span className="font-medium tabular-nums text-[var(--ink)]">
+            1 {BUDGET_CURRENCY} ={" "}
+            {formatMoney(headlineRate.rate, BASE_CURRENCY)}
+          </span>
+          <span className="text-xs text-[var(--muted)]">
+            {headlineRate.date
+              ? `ECB rate, ${formatRangeLabel(headlineRate.date, headlineRate.date)}`
+              : "Your saved rate. Live rates are unavailable"}
+          </span>
+        </p>
+      ) : null}
+
+      <BudgetTracker
+        from={from}
+        to={to}
+        accounts={accounts}
+        categories={categories}
+        dailyRates={dailyRates}
+        manualRates={manualRates}
+        transactions={transactions}
+      />
 
       {/* ------------------------------------------------------------------ */}
       {/* Net worth                                                            */}
