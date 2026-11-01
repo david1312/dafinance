@@ -1,6 +1,7 @@
-import { upsertRate } from "@/app/actions";
+import { refreshRatesFromEcb, upsertRate } from "@/app/actions";
 import { SubmitButton } from "@/components/submit-button";
 import { CURRENCIES } from "@/lib/currencies";
+import { formatRangeLabel } from "@/lib/dashboard-range";
 import { createClient } from "@/lib/supabase/server";
 import type { ExchangeRate } from "@/lib/types";
 
@@ -21,8 +22,18 @@ export default async function SettingsPage() {
         Exchange rates
       </h1>
       <p className="mt-1 text-[var(--muted)]">
-        Manual rates for now. Dashboard converts everything to IDR.
+        The dashboard uses live ECB rates. These saved rates are the fallback
+        when the live ones can&rsquo;t be loaded.
       </p>
+
+      <form action={refreshRatesFromEcb} className="mt-6">
+        <SubmitButton
+          className="rounded-lg border border-[var(--accent-strong)] px-3 py-2 font-medium text-[var(--accent-strong)]"
+          pendingLabel="Refreshing…"
+        >
+          Refresh all from ECB
+        </SubmitButton>
+      </form>
 
       <form action={upsertRate} className="mt-8 grid gap-3 sm:grid-cols-4">
         <select
@@ -71,6 +82,13 @@ export default async function SettingsPage() {
             className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] px-4 py-3"
           >
             1 {rate.from_currency} = {rate.rate} {rate.to_currency}
+            <span className="ml-2 text-xs text-[var(--muted)]">
+              updated{" "}
+              {formatRangeLabel(
+                rate.updated_at.slice(0, 10),
+                rate.updated_at.slice(0, 10),
+              )}
+            </span>
           </li>
         ))}
       </ul>
