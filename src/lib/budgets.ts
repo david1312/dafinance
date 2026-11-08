@@ -41,12 +41,6 @@ export const BUDGETS: Budget[] = [
     amount: 15_000,
     keywords: ["transport", "travel", "commute", "train"],
   },
-  {
-    id: "remittance",
-    label: "Kiriman uang ke Indo",
-    amount: 150_000,
-    keywords: ["kiriman"],
-  },
 ];
 
 function daysInMonth(month: string) {
